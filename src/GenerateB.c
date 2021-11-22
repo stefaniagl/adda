@@ -203,6 +203,52 @@ void InitBeam(void)
 			}
 			return;
 		case B_BESSELASD:
+			if (surface) {
+				if (use_beam_center==true) LogError(ONE_POS,"Plane wave currently does not support -beam_center with -surf");
+				if (prop_0[2]==0) PrintError("Ambiguous setting of beam propagating along the surface. Please specify "
+					"the incident direction to have (arbitrary) small positive or negative z-component");
+				if (msubInf && prop_0[2]>0) PrintError("Perfectly reflecting surface ('-surf ... inf') is incompatible "
+					"with incident direction from below (including the default one)");
+				// Here we set ki,kt,ktVec and propagation directions prIncRefl,prIncTran
+				if (prop_0[2]>0) { // beam comes from the substrate (below)
+					// here msub should always be defined
+					inc_scale=1/creal(msub);
+					ki=msub*prop_0[2];
+					/* Special case for msub near 1 to remove discontinuities for near-grazing incidence. The details
+					 * are discussed in CalcFieldSurf() in crosssec.c.
+					 */
+					if (cabs(msub-1)<ROUND_ERR && cabs(ki)<SQRT_RND_ERR) kt=ki;
+					else kt=cSqrtCut(1 - msub*msub*(prop_0[0]*prop_0[0]+prop_0[1]*prop_0[1]));
+					// determine propagation direction and full wavevector of wave transmitted into substrate
+					ktVec[0]=msub*prop_0[0];
+					ktVec[1]=msub*prop_0[1];
+					ktVec[2]=kt;
+				}
+				else if (prop_0[2]<0) { // beam comes from above the substrate
+					inc_scale=1;
+					vRefl(prop_0,prIncRefl);
+					ki=-prop_0[2]; // always real
+					if (!msubInf) {
+						// same special case as above
+						if (cabs(msub-1)<ROUND_ERR && cabs(ki)<SQRT_RND_ERR) kt=ki;
+						else kt=cSqrtCut(msub*msub - (prop_0[0]*prop_0[0]+prop_0[1]*prop_0[1]));
+						// determine propagation direction of wave transmitted into substrate
+						ktVec[0]=prop_0[0];
+						ktVec[1]=prop_0[1];
+						ktVec[2]=-kt;
+					}
+				}
+				// initialize parameters
+				n0=round(beam_pars[0]);
+				alpha0=beam_pars[1];
+				beam_asym=(beam_center_0[0]!=0 || beam_center_0[1]!=0 || beam_center_0[2]!=0);
+				symR=symX=symY=symZ=false;
+				if (!beam_asym) vInit(beam_center);
+				// beam info
+				if (IFROOT) beam_descr=dyn_sprintf("Bessel beam (%s)\n"
+							"\tOrder: ""%d""\n\t""Half-cone angle: "GFORMDEF"\n"
+							"\tCenter position: "GFORMDEF3V,"angular spectrum decomposition",n0,alpha0,COMP3V(beam_center_0));
+			return;
 		case B_BESSELCS:
 		case B_BESSELCSp:
 		case B_BESSELM:
@@ -324,7 +370,7 @@ void InitBeam(void)
 }
 
 //======================================================================================================================
-void Fpw(doublecomplex *F,int l,doublecomplex k,double r0,double tht0, double phi0, double alph, double bet)
+static void Fpw(doublecomplex *F,int l,doublecomplex k,double r0,double tht0, double phi0, double alph, double bet)
 {
 	doublecomplex fexp = cexp(I*l*bet + I*k*r0*(sin(alph)*sin(tht0)*cos(bet-phi0)+cos(alph)*cos(tht0)));
 	*F = (cos(alph)*cos(bet)*cos(bet)+sin(bet)*sin(bet))*fexp;
