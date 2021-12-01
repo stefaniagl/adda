@@ -279,6 +279,17 @@ static inline double crDotProd_Re(const doublecomplex a[static 3],const double b
 
 //======================================================================================================================
 
+static inline void cvLinComb(const doublecomplex a[static 3],const doublecomplex b[static 3],const double c1, const double c2,
+	doublecomplex c[static 3])
+// linear combination of complex vectors[3] with real coefficient; second coefficient is unity; c=c1*a+b
+{
+	c[0] = c1*a[0] + c2*b[0];
+	c[1] = c1*a[1] + c2*b[1];
+	c[2] = c1*a[2] + c2*b[2];
+}
+
+//======================================================================================================================
+
 static inline void cvLinComb1(const doublecomplex a[static 3],const doublecomplex b[static 3],const double c1,
 	doublecomplex c[static 3])
 // linear combination of complex vectors[3] with real coefficient; second coefficient is unity; c=c1*a+b
