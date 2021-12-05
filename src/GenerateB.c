@@ -631,17 +631,6 @@ void GenerateB (const enum incpol which,   // x - or y polarized incident light
 						cvBuildRe(ex,exC);
 						cvBuildRe(ey,eyC);
 						cvBuildRe(prop,ezC);
-
-
-						/*
-						printf("\n Error1 (%g)",creal(eper[0]));
-						printf("\n Error2 (%g)",creal(eper[1]));
-						printf("\n Error3 (%g)",creal(eper[2]));
-						printf("\n");
-
-						LogError(ONE_POS,"\n Error (%g)",creal(blank[2]));
-						 */
-
 						cvLinComb(exC,eyC,cos(beta),sin(beta),blank);
 						cvLinComb(ezC,blank,-cos(alpha0),-sin(alpha0),epar);
 						cvLinComb(exC,eyC,sin(beta),-cos(beta),eper);
