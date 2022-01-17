@@ -236,7 +236,7 @@ static const struct subopt_struct beam_opt[]={
 		"(zero, by default). All arguments are in um. This is recommended option for simulation of the Gaussian beam. "
 		"Specification of coordinates here is DEPRECATED, use -beam_center instead.",UNDEF,B_BARTON5},
 		{"besselASD","<order> <angle>","Angular spectrum decomposition of Bessel beam. Order is integer (of any "
-			"sign) and the half-cone angle (in degrees) is measured from the z-axis.",2,B_BESSELASD},
+			"sign) and the half-cone angle (in degrees) is measured from the z-axis.",2,B_BES_ASD},
 #ifndef NO_FORTRAN
 	{"besselCS","<order> <angle>","Bessel beam with circularly symmetric energy density. Order is integer (of any "
 		"sign) and the half-cone angle (in degrees) is measured from the z-axis.",2,B_BES_CS},
@@ -1029,14 +1029,6 @@ PARSE_FUNC(asym)
 	calc_asym = true;
 	calc_vec = true;
 	calc_Csca = true;
-}
-PARSE_FUNC(beam_center)
-{
-	if (Narg!=3) NargError(Narg,"-beam_center requires 3 arguments");
-	use_beam_center = true;
-	ScanDoubleError(argv[1],&beam_center_0[0]);
-	ScanDoubleError(argv[2],&beam_center_0[1]);
-	ScanDoubleError(argv[3],&beam_center_0[2]);
 }
 PARSE_FUNC(beam)
 {

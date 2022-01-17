@@ -45,8 +45,6 @@ extern const opt_index opt_beam;
 extern const bool use_beam_center;
 extern const bool use_beam_subopt;
 
-extern void bjndd_(int *n, double *x, double *bj, double *dj, double *fj);
-
 
 
 // used in CalculateE.c
@@ -192,62 +190,62 @@ void InitBeam(void)
 				                       "\tWidth="GFORMDEF" (confinement factor s="GFORMDEF")",tmp_str,w0,s);
 			}
 			return;
-  case B_BESSELASD:
-    if (surface) {
-      /* here we assume that prop_0 will not change further (e.g., by rotation of particle),
-       * i.e. prop=prop_0 in GenerateBeam() below
-       */
-      if (prop_0[2]==0) PrintError("Ambiguous setting of beam propagating along the surface. Please specify "
-        "the incident direction to have (arbitrary) small positive or negative z-component");
-      if (msubInf && prop_0[2]>0) PrintError("Perfectly reflecting surface ('-surf ... inf') is incompatible "
-        "with incident direction from below (including the default one)");
-      // Here we set ki,kt,ktVec and propagation directions prIncRefl,prIncTran
-      if (prop_0[2]>0) { // beam comes from the substrate (below)
-        // here msub should always be defined
-        inc_scale=1/creal(msub);
-        ki=msub*prop_0[2];
-        /* Special case for msub near 1 to remove discontinuities for near-grazing incidence. The details
-         * are discussed in CalcFieldSurf() in crosssec.c.
-         */
-        if (cabs(msub-1)<ROUND_ERR && cabs(ki)<SQRT_RND_ERR) kt=ki;
-        else kt=cSqrtCut(1 - msub*msub*(prop_0[0]*prop_0[0]+prop_0[1]*prop_0[1]));
-        // determine propagation direction and full wavevector of wave transmitted into substrate
-        ktVec[0]=msub*prop_0[0];
-        ktVec[1]=msub*prop_0[1];
-        ktVec[2]=kt;
-      }
-      else if (prop_0[2]<0) { // beam comes from above the substrate
-        inc_scale=1;
-        ki=-prop_0[2]; // always real
-        if (!msubInf) {
-          // same special case as above
-          if (cabs(msub-1)<ROUND_ERR && cabs(ki)<SQRT_RND_ERR) kt=ki;
-          else kt=cSqrtCut(msub*msub - (prop_0[0]*prop_0[0]+prop_0[1]*prop_0[1]));
-          // determine propagation direction of wave transmitted into substrate
-          ktVec[0]=prop_0[0];
-          ktVec[1]=prop_0[1];
-          ktVec[2]=-kt;
-        }
-      }
-      else LogError(ONE_POS,"Ambiguous setting of beam propagating along the surface. Please specify the"
-        "incident direction to have (arbitrary) small positive or negative z-component");
-      vRefl(prop_0,prIncRefl);
-      if (!msubInf) {
-        vReal(ktVec,prIncTran);
-        vNormalize(prIncTran);
-      }
-    }
-    // initialize parameters
-    ConvertToInteger(beam_pars[0],"beam order",&besN);
-    TestRangeII(besN,"beam order (might cause the incorrect calculation of Bessel function)",-50,50);
-    vorticity=besN;
-    TestRangeII(beam_pars[1],"half-cone angle",0,90);
-    besAlpha=Deg2Rad(beam_pars[1]);
-    symR=symX=symY=symZ=false;
-    // beam info
-    if (IFROOT) beam_descr=dyn_sprintf("Bessel beam (angular spectrum decomposition)\n"
-                      "\tOrder: %d, half-cone angle: "GFORMDEF" deg",besN,beam_pars[1]);
-    return;
+	  case B_BES_ASD:
+	    if (surface) {
+	      /* here we assume that prop_0 will not change further (e.g., by rotation of particle),
+	       * i.e. prop=prop_0 in GenerateBeam() below
+	       */
+	      if (prop_0[2]==0) PrintError("Ambiguous setting of beam propagating along the surface. Please specify "
+	        "the incident direction to have (arbitrary) small positive or negative z-component");
+	      if (msubInf && prop_0[2]>0) PrintError("Perfectly reflecting surface ('-surf ... inf') is incompatible "
+	        "with incident direction from below (including the default one)");
+	      // Here we set ki,kt,ktVec and propagation directions prIncRefl,prIncTran
+	      if (prop_0[2]>0) { // beam comes from the substrate (below)
+	        // here msub should always be defined
+	        inc_scale=1/creal(msub);
+	        ki=msub*prop_0[2];
+	        /* Special case for msub near 1 to remove discontinuities for near-grazing incidence. The details
+	         * are discussed in CalcFieldSurf() in crosssec.c.
+	         */
+	        if (cabs(msub-1)<ROUND_ERR && cabs(ki)<SQRT_RND_ERR) kt=ki;
+	        else kt=cSqrtCut(1 - msub*msub*(prop_0[0]*prop_0[0]+prop_0[1]*prop_0[1]));
+	        // determine propagation direction and full wavevector of wave transmitted into substrate
+	        ktVec[0]=msub*prop_0[0];
+	        ktVec[1]=msub*prop_0[1];
+	        ktVec[2]=kt;
+	      }
+	      else if (prop_0[2]<0) { // beam comes from above the substrate
+	        inc_scale=1;
+	        ki=-prop_0[2]; // always real
+	        if (!msubInf) {
+	          // same special case as above
+	          if (cabs(msub-1)<ROUND_ERR && cabs(ki)<SQRT_RND_ERR) kt=ki;
+	          else kt=cSqrtCut(msub*msub - (prop_0[0]*prop_0[0]+prop_0[1]*prop_0[1]));
+	          // determine propagation direction of wave transmitted into substrate
+	          ktVec[0]=prop_0[0];
+	          ktVec[1]=prop_0[1];
+	          ktVec[2]=-kt;
+	        }
+	      }
+	      else LogError(ONE_POS,"Ambiguous setting of beam propagating along the surface. Please specify the"
+	        "incident direction to have (arbitrary) small positive or negative z-component");
+	      vRefl(prop_0,prIncRefl);
+	      if (!msubInf) {
+	        vReal(ktVec,prIncTran);
+	        vNormalize(prIncTran);
+	      }
+	    }
+	    // initialize parameters
+	    ConvertToInteger(beam_pars[0],"beam order",&besN);
+	    TestRangeII(besN,"beam order (might cause the incorrect calculation of Bessel function)",-50,50);
+	    vorticity=besN;
+	    TestRangeII(beam_pars[1],"half-cone angle",0,90);
+	    besAlpha=Deg2Rad(beam_pars[1]);
+	    symR=symX=symY=symZ=false;
+	    // beam info
+	    if (IFROOT) beam_descr=dyn_sprintf("Bessel beam (angular spectrum decomposition)\n"
+	                      "\tOrder: %d, half-cone angle: "GFORMDEF" deg",besN,beam_pars[1]);
+	  return;
 #ifndef NO_FORTRAN
 		case B_BES_CS:
 		case B_BES_CSp:
@@ -395,7 +393,8 @@ void GenerateB (const enum incpol which,   // x - or y polarized incident light
 	 * the ratio of amplitudes of the electric fields. In particular, when E=E0*e, ||E||!=|E0|*||e||, where
 	 * ||e||^2=(e,e*)=|e_x|^2+|e_y|^2+|e_z|^2=1
 	 */
-	doublecomplex eIncTran[3];
+	doublecomplex eIncTran[3],eIncRefl[3];
+	doublecomplex eIncRefls[3],eIncReflp[3],eIncTrans[3],eIncTranp[3];
   // for Bessel ASD
   int N,it;
   doublecomplex sum[3],fint[3],blank[3],epar[3],eper[3],exC[3],eyC[3],ezC[3];
@@ -405,7 +404,7 @@ void GenerateB (const enum incpol which,   // x - or y polarized incident light
 	int n1,q;
 	doublecomplex vort;  // vortex phase of Bessel beam rotated by 90 deg
 	doublecomplex fn[5]; // for general functions f(n,ro,phi) of Bessel beams (fn-2, fn-1, fn, fn+1, fn+2, respectively)
-	double phi,arg,r,td1[abs(besN)+3],td2[abs(besN)+3],jn1[abs(besN)+3]; // for Bessel beams
+	double arg,td1[abs(besN)+3],td2[abs(besN)+3],jn1[abs(besN)+3]; // for Bessel beams
 #endif
 	const char *fname;
 	/* TO ADD NEW BEAM
@@ -611,7 +610,7 @@ void GenerateB (const enum incpol which,   // x - or y polarized incident light
 				}
 			}
 			return;
-  case B_BESSELASD:
+  case B_BES_ASD:
     if (surface) {
       /* With respect to normalization we use here the same assumption as in the free space - the origin is in
        * the particle center, and amplitude of incoming plane wave is equal to 1. Then irradiance of the beam
