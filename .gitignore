@@ -1,25 +1,10 @@
-# The same ignores apply to all compilation folders
-/*/*.exe
-/*/*.dll
-/*/adda*
-/*/*.o
-/*/*.d
-/*/.*opts
-/*/*stackdump
-/*/ExpCount
-/*/tables/
-/*/run*/
-/*/test*/
-/*/*.dat
-/*/*.geom
-/*/out
-/*/*.clstr
+# If you need some ignores, which are specific to your workflow (e.g. IDE), consider
+# including them into $GIT_DIR/info/exclude (in this repository) or globally into $XDG_CONFIG_HOME/git/ignore
+# See https://git-scm.com/docs/gitignore
 
+# for MacOS
+.DS_Store
 
-src/githash.h
-src/.cproject
-src/.settings/language.settings.xml
-src/.cproject
-src/githash.h
-src/githash.h
-*.h
+# for Eclipse
+.сproject
+.project

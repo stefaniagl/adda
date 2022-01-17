@@ -51,22 +51,14 @@ extern void bjndd_(int *n, double *x, double *bj, double *dj, double *fj);
 
 // used in CalculateE.c
 double C0dipole,C0dipole_refl; // inherent cross sections of exciting dipole (in free space and addition due to surface)
-
-// used in crosssec.c
-double beam_center_0[3]; // position of the beam center in laboratory reference frame
-/* complex wave amplitudes of secondary waves (with phase relative to particle center);
- * The transmitted wave can be inhomogeneous wave (when msub is complex), then eIncTran (e) is normalized
- * counter-intuitively. Before multiplying by tc, it satisfies (e,e)=1!=||e||^2. This normalization is consistent with
- * used formulae for transmission coefficients. So this transmission coefficient is not (generally) equal to the ratio
- * of amplitudes of the electric fields. In particular, when E=E0*e, ||E||!=|E0|*||e||, where
- * ||e||^2=(e,e*)=|e_x|^2+|e_y|^2+|e_z|^2=1
- *
- * !!! TODO: determine whether they are actually needed in crosssec.c, or make them static here
- */
-doublecomplex eIncRefl[3],eIncTran[3];
-doublecomplex eIncRefls[3],eIncReflp[3],eIncTrans[3],eIncTranp[3];
+int vorticity;                 // Vorticity of vortex beams (besN for Bessel beams)
 // used in param.c
 const char *beam_descr; // string for log file with beam parameters
+/* Propagation (phase) directions of secondary incident beams above (refl) and below (tran) the surface (unit vectors)
+ * When msub is complex, one of this doesn't tell the complete story, since the corresponding wave is inhomogeneous,
+ * given by the complex wavenumber ktVec
+ */
+double prIncRefl[3],prIncTran[3];
 
 // LOCAL VARIABLES
 static double s,s2;            // beam confinement factor and its square
@@ -74,15 +66,24 @@ static double scale_x,scale_z; // multipliers for scaling coordinates
 static doublecomplex ki,kt;    // abs of normal components of k_inc/k0, and ktran/k0
 static doublecomplex ktVec[3]; // k_tran/k0
 static double p0;              // amplitude of the incident dipole moment
-static int n0;                 // Bessel beam order
-static double alpha0;          // half-cone angle
-static doublecomplex K,Kt,Kz;  // wave vector components
-static double M[4];		   	   // Matrix M components
+
+#ifndef NO_FORTRAN
+static int besN;                  // Bessel beam order
+static double besAlpha;           // half-cone angle (in radians)
+static doublecomplex besKt,besKz; // wave-vector components (transverse and longitudinal)
+static doublecomplex besM[4];     // Matrix M defining the generalized Bessel beam
+#endif
 /* TO ADD NEW BEAM
  * Add here all internal variables (beam parameters), which you initialize in InitBeam() and use in GenerateB()
  * afterwards. If you need local, intermediate variables, put them into the beginning of the corresponding function.
  * Add descriptive comments, use 'static'.
  */
+
+// EXTERNAL FUNCTIONS
+
+#ifndef NO_FORTRAN
+void bjndd_(const int *n,const double *x,double *bj,double *dj,double *fj);
+#endif
 
 //======================================================================================================================
 
@@ -94,17 +95,20 @@ void InitBeam(void)
 	/* TO ADD NEW BEAM
 	 * Add here all intermediate variables, which are used only inside this function.
 	 */
+
 	// initialization of global option index for error messages
 	opt=opt_beam;
 	// beam initialization
-	if (use_beam_center==true && use_beam_subopt==true) LogError(ONE_POS,"Beam center coordinates can not "
-			"be defined both in -beam and in -beam_center options. Please define in only one of the options.");
+	beam_asym=(beam_center_0[0]!=0 || beam_center_0[1]!=0 || beam_center_0[2]!=0);
+	if (!beam_asym) vInit(beam_center); // not to calculate it for each orientation
+	vorticity = 0;
 	switch (beamtype) {
 		case B_PLANE:
 			if (IFROOT) beam_descr="plane wave";
-			beam_asym=false;
 			if (surface) {
-				if (use_beam_center==true) LogError(ONE_POS,"Plane wave currently does not support -beam_center with -surf");
+				/* here we assume that prop_0 will not change further (e.g., by rotation of particle),
+				 * i.e. prop=prop_0 in GenerateBeam() below
+				 */
 				if (prop_0[2]==0) PrintError("Ambiguous setting of beam propagating along the surface. Please specify "
 					"the incident direction to have (arbitrary) small positive or negative z-component");
 				if (msubInf && prop_0[2]>0) PrintError("Perfectly reflecting surface ('-surf ... inf') is incompatible "
@@ -126,7 +130,6 @@ void InitBeam(void)
 				}
 				else if (prop_0[2]<0) { // beam comes from above the substrate
 					inc_scale=1;
-					vRefl(prop_0,prIncRefl);
 					ki=-prop_0[2]; // always real
 					if (!msubInf) {
 						// same special case as above
@@ -148,24 +151,17 @@ void InitBeam(void)
 			}
 			return;
 		case B_DIPOLE:
-			if (use_beam_subopt==true){
-				LogWarning(EC_WARN,ALL_POS,"Providing beam center coordinates from the -beam option will be deprecated soon. Please use -beam_center option instead.");
-				vCopy(beam_pars,beam_center_0);
-			}
 			if (surface) {
 				if (beam_center_0[2]<=-hsub)
 					PrintErrorHelp("External dipole should be placed strictly above the surface");
 				inc_scale=1; // but scaling of Mueller matrix is weird anyway
 			}
-			// in weird scenarios the dipole can be positioned exactly at the origin; reused code from Gaussian beams
-			beam_asym=(beam_center_0[0]!=0 || beam_center_0[1]!=0 || beam_center_0[2]!=0);
-			if (!beam_asym) vInit(beam_center);
 			/* definition of p0 is important for scaling of many scattering quantities (that are normalized to incident
 			 * irradiance). Alternative definition is p0=1, but then the results will scale with unit of length
 			 * (breaking scale invariance)
 			 */
 			p0=1/(WaveNum*WaveNum*WaveNum);
-			if (IFROOT) beam_descr=dyn_sprintf("point dipole at "GFORMDEF3V,COMP3V(beam_center_0));
+			if (IFROOT) beam_descr="point dipole";
 			return;
 		case B_LMINUS:
 		case B_DAVIS3:
@@ -174,12 +170,6 @@ void InitBeam(void)
 			// initialize parameters
 			w0=beam_pars[0];
 			TestPositive(w0,"beam width");
-			if (use_beam_subopt==true){
-				LogWarning(EC_WARN,ALL_POS,"Providing beam center coordinates from the -beam option will be deprecated soon. Please use -beam_center option instead.");
-				vCopy(beam_pars+1,beam_center_0);
-			}
-			beam_asym=(beam_center_0[0]!=0 || beam_center_0[1]!=0 || beam_center_0[2]!=0);
-			if (!beam_asym) vInit(beam_center);
 			s=1/(WaveNum*w0);
 			s2=s*s;
 			scale_x=1/w0;
@@ -199,139 +189,147 @@ void InitBeam(void)
 					default: LogError(ONE_POS,"Incompatibility error in GenerateB");
 				}
 				beam_descr=dyn_sprintf("Gaussian beam (%s)\n"
-				                       "\tWidth="GFORMDEF" (confinement factor s="GFORMDEF")\n"
-				                       "\tCenter position: "GFORMDEF3V,tmp_str,w0,s,COMP3V(beam_center_0));
+				                       "\tWidth="GFORMDEF" (confinement factor s="GFORMDEF")",tmp_str,w0,s);
 			}
 			return;
-		case B_BESSELASD:
-			if (surface) {
-				if (use_beam_center==true) LogError(ONE_POS,"Plane wave currently does not support -beam_center with -surf");
-				if (prop_0[2]==0) PrintError("Ambiguous setting of beam propagating along the surface. Please specify "
-					"the incident direction to have (arbitrary) small positive or negative z-component");
-				if (msubInf && prop_0[2]>0) PrintError("Perfectly reflecting surface ('-surf ... inf') is incompatible "
-					"with incident direction from below (including the default one)");
-				// Here we set ki,kt,ktVec and propagation directions prIncRefl,prIncTran
-				if (prop_0[2]>0) { // beam comes from the substrate (below)
-					// here msub should always be defined
-					inc_scale=1/creal(msub);
-					ki=msub*prop_0[2];
-					/* Special case for msub near 1 to remove discontinuities for near-grazing incidence. The details
-					 * are discussed in CalcFieldSurf() in crosssec.c.
-					 */
-					if (cabs(msub-1)<ROUND_ERR && cabs(ki)<SQRT_RND_ERR) kt=ki;
-					else kt=cSqrtCut(1 - msub*msub*(prop_0[0]*prop_0[0]+prop_0[1]*prop_0[1]));
-					// determine propagation direction and full wavevector of wave transmitted into substrate
-					ktVec[0]=msub*prop_0[0];
-					ktVec[1]=msub*prop_0[1];
-					ktVec[2]=kt;
-				}
-				else if (prop_0[2]<0) { // beam comes from above the substrate
-					inc_scale=1;
-					vRefl(prop_0,prIncRefl);
-					ki=-prop_0[2]; // always real
-					if (!msubInf) {
-						// same special case as above
-						if (cabs(msub-1)<ROUND_ERR && cabs(ki)<SQRT_RND_ERR) kt=ki;
-						else kt=cSqrtCut(msub*msub - (prop_0[0]*prop_0[0]+prop_0[1]*prop_0[1]));
-						// determine propagation direction of wave transmitted into substrate
-						ktVec[0]=prop_0[0];
-						ktVec[1]=prop_0[1];
-						ktVec[2]=-kt;
-					}
-				}
-			}
-			// initialize parameters
-			n0=round(beam_pars[0]);
-			alpha0=beam_pars[1];
-			beam_asym=(beam_center_0[0]!=0 || beam_center_0[1]!=0 || beam_center_0[2]!=0);
-			symR=symX=symY=symZ=false;
-			if (!beam_asym) vInit(beam_center);
-			// beam info
-			if (IFROOT) beam_descr=dyn_sprintf("Bessel beam (%s)\n"
-						"\tOrder: ""%d""\n\t""Half-cone angle: "GFORMDEF"\n"
-						"\tCenter position: "GFORMDEF3V,"angular spectrum decomposition",n0,alpha0,COMP3V(beam_center_0));
-			return;
-		case B_BESSELCS:
-		case B_BESSELCSp:
-		case B_BESSELM:
-		case B_BESSELLE:
-		case B_BESSELLM:
-		case B_BESSELTEL:
-		case B_BESSELTML:
+  case B_BESSELASD:
+    if (surface) {
+      /* here we assume that prop_0 will not change further (e.g., by rotation of particle),
+       * i.e. prop=prop_0 in GenerateBeam() below
+       */
+      if (prop_0[2]==0) PrintError("Ambiguous setting of beam propagating along the surface. Please specify "
+        "the incident direction to have (arbitrary) small positive or negative z-component");
+      if (msubInf && prop_0[2]>0) PrintError("Perfectly reflecting surface ('-surf ... inf') is incompatible "
+        "with incident direction from below (including the default one)");
+      // Here we set ki,kt,ktVec and propagation directions prIncRefl,prIncTran
+      if (prop_0[2]>0) { // beam comes from the substrate (below)
+        // here msub should always be defined
+        inc_scale=1/creal(msub);
+        ki=msub*prop_0[2];
+        /* Special case for msub near 1 to remove discontinuities for near-grazing incidence. The details
+         * are discussed in CalcFieldSurf() in crosssec.c.
+         */
+        if (cabs(msub-1)<ROUND_ERR && cabs(ki)<SQRT_RND_ERR) kt=ki;
+        else kt=cSqrtCut(1 - msub*msub*(prop_0[0]*prop_0[0]+prop_0[1]*prop_0[1]));
+        // determine propagation direction and full wavevector of wave transmitted into substrate
+        ktVec[0]=msub*prop_0[0];
+        ktVec[1]=msub*prop_0[1];
+        ktVec[2]=kt;
+      }
+      else if (prop_0[2]<0) { // beam comes from above the substrate
+        inc_scale=1;
+        ki=-prop_0[2]; // always real
+        if (!msubInf) {
+          // same special case as above
+          if (cabs(msub-1)<ROUND_ERR && cabs(ki)<SQRT_RND_ERR) kt=ki;
+          else kt=cSqrtCut(msub*msub - (prop_0[0]*prop_0[0]+prop_0[1]*prop_0[1]));
+          // determine propagation direction of wave transmitted into substrate
+          ktVec[0]=prop_0[0];
+          ktVec[1]=prop_0[1];
+          ktVec[2]=-kt;
+        }
+      }
+      else LogError(ONE_POS,"Ambiguous setting of beam propagating along the surface. Please specify the"
+        "incident direction to have (arbitrary) small positive or negative z-component");
+      vRefl(prop_0,prIncRefl);
+      if (!msubInf) {
+        vReal(ktVec,prIncTran);
+        vNormalize(prIncTran);
+      }
+    }
+    // initialize parameters
+    ConvertToInteger(beam_pars[0],"beam order",&besN);
+    TestRangeII(besN,"beam order (might cause the incorrect calculation of Bessel function)",-50,50);
+    vorticity=besN;
+    TestRangeII(beam_pars[1],"half-cone angle",0,90);
+    besAlpha=Deg2Rad(beam_pars[1]);
+    symR=symX=symY=symZ=false;
+    // beam info
+    if (IFROOT) beam_descr=dyn_sprintf("Bessel beam (angular spectrum decomposition)\n"
+                      "\tOrder: %d, half-cone angle: "GFORMDEF" deg",besN,beam_pars[1]);
+    return;
+#ifndef NO_FORTRAN
+		case B_BES_CS:
+		case B_BES_CSp:
+		case B_BES_M:
+		case B_BES_LE:
+		case B_BES_LM:
+		case B_BES_TEL:
+		case B_BES_TML:
 			if (surface) PrintError("Currently, Bessel incident beam is not supported for '-surf'");
 			// initialize parameters
-			n0=round(beam_pars[0]);
-			alpha0=beam_pars[1];
-			K =fabs(WaveNum);
-			Kt=fabs(WaveNum)*sin(alpha0);
-			Kz=fabs(WaveNum)*cos(alpha0);
-			switch (beamtype) { // definition of matrix M elements ((Mex,Mey),(Mmx,Mmy))
-				case B_BESSELCS:
-					M[0]=0.5;	M[1]=0;
-					M[2]=0;		M[3]=0.5;
+			ConvertToInteger(beam_pars[0],"beam order",&besN);
+			TestRangeII(besN,"beam order (might cause the incorrect calculation of Bessel function)",-50,50);
+			vorticity=besN;
+			besAlpha=Deg2Rad(beam_pars[1]);
+			besKt=WaveNum*sin(besAlpha);
+			besKz=WaveNum*cos(besAlpha);
+			switch (beamtype) { // definition of elements of matrix M ((Mex,Mey),(Mmx,Mmy))
+				case B_BES_CS:
+					TestRangeII(beam_pars[1],"half-cone angle",0,90);
+					besM[0]=0.5;  besM[1]=0;
+					besM[2]=0;    besM[3]=0.5;
+					if (IFROOT) tmp_str="circularly symmetric energy density";
 					break;
-				case B_BESSELCSp:
-					M[0]=0.5;	M[1]=0;
-					M[2]=0;		M[3]=-0.5;
+				case B_BES_CSp:
+					TestRangeII(beam_pars[1],"half-cone angle",0,90);
+					besM[0]=0.5;  besM[1]=0;
+					besM[2]=0;    besM[3]=-0.5;
+					if (IFROOT) tmp_str="circularly symmetric energy density, alternative type";
 					break;
-				case B_BESSELM:
-					M[0]=beam_pars[2]+I*beam_pars[6];
-					M[1]=beam_pars[3]+I*beam_pars[7];
-					M[2]=beam_pars[4]+I*beam_pars[8];
-					M[3]=beam_pars[5]+I*beam_pars[9];
+				case B_BES_M:
+					TestRangeII(beam_pars[1],"half-cone angle",0,90);
+					if (beam_Npars==6) {
+						besM[0]=beam_pars[2];
+						besM[1]=beam_pars[3];
+						besM[2]=beam_pars[4];
+						besM[3]=beam_pars[5];
+					}
+					else {
+						besM[0]=beam_pars[2]+I*beam_pars[6];
+						besM[1]=beam_pars[3]+I*beam_pars[7];
+						besM[2]=beam_pars[4]+I*beam_pars[8];
+						besM[3]=beam_pars[5]+I*beam_pars[9];
+					}
+					if (IFROOT) tmp_str="generalized";
 					break;
-				case B_BESSELLE:
-					M[0]=0;		M[1]=0;
-					M[2]=0;		M[3]=1;
+				case B_BES_LE:
+					TestRangeII(beam_pars[1],"half-cone angle",0,90);
+					besM[0]=0;  besM[1]=0;
+					besM[2]=0;  besM[3]=1;
+					if (IFROOT) tmp_str="linear electric field";
 					break;
-				case B_BESSELLM:
-					M[0]=0;		M[1]=1;
-					M[2]=0;		M[3]=0;
+				case B_BES_LM:
+					TestRangeII(beam_pars[1],"half-cone angle",0,90);
+					besM[0]=0;  besM[1]=1;
+					besM[2]=0;  besM[3]=0;
+					if (IFROOT) tmp_str="linear magnetic field";
 					break;
-				case B_BESSELTEL:
-					M[0]=-K/Kt;		M[1]=0;
-					M[2]=0;			M[3]=Kz/Kt;
+				/* TODO: for the following two types, both 0 and 90 degrees should be fine, but may require some
+				 * rearrangement of formulae. Then the tests for range of alpha should be moved outside of the case
+				 */
+				case B_BES_TEL:
+					TestRangeNN(beam_pars[1],"half-cone angle for TEL type",0,90);
+					besM[0]=-WaveNum/besKt;  besM[1]=0;
+					besM[2]=0;               besM[3]=besKz/besKt;
+					if (IFROOT) tmp_str="linear component of the TE";
 					break;
-				case B_BESSELTML:
-					M[0]=0; 		M[1]=Kz/Kt;
-					M[2]=K/Kt;		M[2]=0;
+				case B_BES_TML:
+					TestRangeNN(beam_pars[1],"half-cone angle for TML type",0,90);
+					besM[0]=0;              besM[1]=besKz/besKt;
+					besM[2]=WaveNum/besKt;  besM[2]=0;
+					if (IFROOT) tmp_str="linear component of the TM";
 					break;
-				default: break;
+				default: LogError(ONE_POS,"Incompatibility error in GenerateB");
 			}
-			beam_asym=(beam_center_0[0]!=0 || beam_center_0[1]!=0 || beam_center_0[2]!=0);
+			// TODO: some symmetries can be retained in some special cases
 			symR=symX=symY=symZ=false;
-			if (!beam_asym) vInit(beam_center);
 			// beam info
-			if (IFROOT) {
-				switch (beamtype) {
-					case B_BESSELCS:
-						tmp_str="circularly symmetric energy density";
-						break;
-					case B_BESSELCSp:
-						tmp_str="circularly symmetric energy density (alternative)";
-						break;
-					case B_BESSELM:
-						tmp_str="generalized";
-						break;
-					case B_BESSELLE:
-						tmp_str="linear electric field";
-						break;
-					case B_BESSELLM:
-						tmp_str="linear magnetic field";
-						break;
-					case B_BESSELTEL:
-						tmp_str="forming the TE Bessel beam";
-						break;
-					case B_BESSELTML:
-						tmp_str="forming the TM Bessel beam";
-						break;
-					default: LogError(ONE_POS,"Incompatibility error in GenerateB");
-				}
-				beam_descr=dyn_sprintf("Bessel beam (%s)\n"
-									   "\tOrder: ""%d""\n\t""Half-cone angle: "GFORMDEF"\n"
-									   "\tCenter position: "GFORMDEF3V,tmp_str,n0,alpha0,COMP3V(beam_center_0));
-			}
+			if (IFROOT) beam_descr=dyn_sprintf("Bessel beam (%s)\n"
+				                               "\tOrder: %d, half-cone angle: "GFORMDEF" deg",
+				                               tmp_str,besN,beam_pars[1]);
 			return;
+#endif // !NO_FORTRAN
 		case B_READ:
 			// the safest is to assume cancellation of all symmetries
 			symX=symY=symZ=symR=false;
@@ -340,7 +338,7 @@ void InitBeam(void)
 				if (beam_Npars==1) beam_descr=dyn_sprintf("specified by file '%s'",beam_fnameY);
 				else beam_descr=dyn_sprintf("specified by files '%s' and '%s'",beam_fnameY,beam_fnameX);
 			}
-			// we do not define beam_asym here, because beam_center is not defined anyway
+			// this type is unaffected by beam_center
 			return;
 	}
 	LogError(ONE_POS,"Unknown type of incident beam (%d)",(int)beamtype);
@@ -356,10 +354,9 @@ void InitBeam(void)
 	 *    symX, symY, symZ - symmetries of reflection over planes YZ, XZ, XY respectively.
 	 *    symR - symmetry of rotation for 90 degrees over the Z axis
 	 * 4) initialize the following:
-	 *    beam_descr - descriptive string, which will appear in log file.
-	 *    beam_asym - whether beam center does not coincide with the reference frame origin. If it is set to true, then
-	 *                set also beam_center_0 - 3D radius-vector of beam center in the laboratory reference frame (it
-	 *                will be then automatically transformed to particle reference frame, if required).
+	 *    beam_descr - descriptive string, which will appear in log file  (should NOT end with \n).
+	 *    vorticity - (only for vortex beam) integer value, how many turns the phase experience, when one makes a full
+	 *                turn around the beam axis.
 	 * 5) Consider the case of surface (substrate near the particle). If the new beam type is incompatible with it, add
 	 *    an explicit exception, like "if (surface) PrintErrorHelp(...);". Otherwise, you also need to define inc_scale.
 	 * All other auxiliary variables, which are used in beam generation (GenerateB(), see below), should be defined in
@@ -391,11 +388,25 @@ void GenerateB (const enum incpol which,   // x - or y polarized incident light
 	const double *ex; // coordinate axis of the beam reference frame
 	double ey[3];
 	double r1[3];
-	int n1,N,it,q; // for Bessel beams
-	doublecomplex vort;  // vortex phase of Bessel beam rotated on 90 deg
-	doublecomplex fn[5]; // for general functions f(n,ro,phi) of Bessel beams (fn-2, fn-1, fn, fn+1, fn+2 respectively)
-	doublecomplex sum[3],fint[3],blank[3],epar[3],eper[3],exC[3],eyC[3],ezC[3];
-	double phi,arg,td1[abs(n0)+3],td2[abs(n0)+3],jn1[abs(n0)+3],r,tht,db,beta; // for Bessel beams
+	/* complex wave amplitudes of transmitted wave (with phase relative to beam center);
+	 * The transmitted wave can be inhomogeneous wave (when msub is complex), then eIncTran (e) is normalized
+	 * counter-intuitively. Before multiplying by tc, it satisfies (e,e)=1!=||e||^2. This normalization is consistent
+	 * with used formulae for transmission coefficients. So this transmission coefficient is not (generally) equal to
+	 * the ratio of amplitudes of the electric fields. In particular, when E=E0*e, ||E||!=|E0|*||e||, where
+	 * ||e||^2=(e,e*)=|e_x|^2+|e_y|^2+|e_z|^2=1
+	 */
+	doublecomplex eIncTran[3];
+  // for Bessel ASD
+  int N,it;
+  doublecomplex sum[3],fint[3],blank[3],epar[3],eper[3],exC[3],eyC[3],ezC[3];
+  double phi,r,tht,db,beta;
+#ifndef NO_FORTRAN
+	// for Bessel beams
+	int n1,q;
+	doublecomplex vort;  // vortex phase of Bessel beam rotated by 90 deg
+	doublecomplex fn[5]; // for general functions f(n,ro,phi) of Bessel beams (fn-2, fn-1, fn, fn+1, fn+2, respectively)
+	double phi,arg,r,td1[abs(besN)+3],td2[abs(besN)+3],jn1[abs(besN)+3]; // for Bessel beams
+#endif
 	const char *fname;
 	/* TO ADD NEW BEAM
 	 * Add here all intermediate variables, which are used only inside this function. You may as well use 't1'-'t8'
@@ -422,75 +433,75 @@ void GenerateB (const enum incpol which,   // x - or y polarized incident light
 				 * the substrate (below) is Exp(i*k*msub*r.a). We assume that the incoming beam is homogeneous in its
 				 * original medium.
 				 */
-				doublecomplex rc,tc; // reflection and transmission coefficients
+				double hbeam=hsub+beam_center[2]; // height of beam center above the surface
 				if (prop[2]>0) { // beam comes from the substrate (below)
-					//  determine amplitude of the reflected and transmitted waves; here msub is always defined
+					doublecomplex tc; // transmission coefficients
+					//  determine amplitude of the transmitted wave; here msub is always defined
 					if (which==INCPOL_Y) { // s-polarized
-						cvBuildRe(ex,eIncRefl);
 						cvBuildRe(ex,eIncTran);
-						rc=FresnelRS(ki,kt);
 						tc=FresnelTS(ki,kt);
 					}
 					else { // p-polarized
-						vInvRefl_cr(ex,eIncRefl);
 						crCrossProd(ey,ktVec,eIncTran);
-						rc=FresnelRP(ki,kt,1/msub);
 						tc=FresnelTP(ki,kt,1/msub);
 					}
-					// phase shift due to the origin at height hsub
-					cvMultScal_cmplx(rc*cexp(-2*I*WaveNum*ki*hsub),eIncRefl,eIncRefl);
-					cvMultScal_cmplx(tc*cexp(I*WaveNum*(kt-ki)*hsub),eIncTran,eIncTran);
+					// phase shift due to the beam center relative to the origin and surface
+					cvMultScal_cmplx(tc*cexp(I*WaveNum*((kt-ki)*hbeam-crDotProd(ktVec,beam_center))),eIncTran,eIncTran);
 					// main part
 					for (i=0;i<local_nvoid_Ndip;i++) {
 						j=3*i;
-						// b[i] = eIncTran*exp(ik*kt.r)
+						// b[i] = eIncTran*exp(ik*kt.r); subtraction of beam_center is avoided by the factor above
 						cvMultScal_cmplx(cexp(I*WaveNum*crDotProd(ktVec,DipoleCoord+j)),eIncTran,b+j);
 					}
 				}
 				else if (prop[2]<0) { // beam comes from above the substrate
-					// determine amplitude of the reflected and transmitted waves
+					/* The following code takes extra care to be stable (not to lose precision) for grazing incidence.
+					 * While it seems more complicated for general incidence, it requires only a few more complex
+					 * arithmetic operations that are negligible compared to two complex exponents. For grazing
+					 * incidence, it is not only stable but may also be faster than the straightforward computation,
+					 * since one of the complex exponents is computed from a very small argument
+					 */
+					// determine reflection coefficient + 1
+					doublecomplex rcp1;
 					if (which==INCPOL_Y) { // s-polarized
-						cvBuildRe(ex,eIncRefl);
-						if (msubInf) {
-							rc=-1;
-							tc=0; // to remove compiler warnings
-						}
-						else {
-							cvBuildRe(ex,eIncTran);
-							rc=FresnelRS(ki,kt);
-							tc=FresnelTS(ki,kt);
-						}
+						if (msubInf) rcp1=0;
+						else rcp1=FresnelTS(ki,kt);
 					}
 					else { // p-polarized
-						vInvRefl_cr(ex,eIncRefl);
-						if (msubInf) {
-							rc=1;
-							tc=0; // to remove compiler warnings
-						}
-						else {
-							crCrossProd(ey,ktVec,eIncTran);
-							cvMultScal_cmplx(1/msub,eIncTran,eIncTran); // normalize eIncTran by ||ktVec||=msub
-							rc=FresnelRP(ki,kt,msub);
-							tc=FresnelTP(ki,kt,msub);
-						}
+						if (msubInf) rcp1=2;
+						else rcp1=msub*FresnelTP(ki,kt,msub);
 					}
-					// phase shift due to the origin at height hsub
-					cvMultScal_cmplx(rc*imExp(2*WaveNum*creal(ki)*hsub),eIncRefl,eIncRefl); // assumes real ki
-					if (!msubInf) cvMultScal_cmplx(tc*cexp(I*WaveNum*(ki-kt)*hsub),eIncTran,eIncTran);
 					// main part
 					for (i=0;i<local_nvoid_Ndip;i++) {
 						j=3*i;
-						// b[i] = ex*exp(ik*r.a) + eIncRefl*exp(ik*prIncRefl.r)
-						cvMultScal_RVec(imExp(WaveNum*DotProd(DipoleCoord+j,prop)),ex,b+j);
-						cvLinComb1_cmplx(eIncRefl,b+j,imExp(WaveNum*DotProd(DipoleCoord+j,prIncRefl)),b+j);
+						vSubtr(DipoleCoord+j,beam_center,r1); // beam_center affects only the common phase factor
+						/* b[i] = ex*exp(ik*r.a) + eIncRefl*exp[ik(prIncRefl.r-2az*hbeam)],
+						 * where prIncRefl is prop with reflected z-component, while eIncRefl=rc*ex for s-polarization
+						 * and (additionally) with reflected transverse (x,y) components for p-polarization
+						 */
+						ctemp=imExp(WaveNum*DotProd(r1,prop)); // exp(ik*r.a)
+						t1=imExpM1(-2*WaveNum*prop[2]*(r1[2]+hbeam));
+						/* t2=exp(ik*r.a){1+rc*exp[-2i*kz(z+hbeam)]}, but the terms in parentheses (rc and exp(...)) are
+						 * replaced by their differences with -1 and 1, respectively (eliminating 1 inside)
+						 */
+						t2=ctemp*(rcp1*(t1+1)-t1);
+						cvMultScal_RVec(t2,ex,b+j);
+						if (which==INCPOL_X) {
+							/* here we add (eIncRefl-ex*rc)*exp[ik(prIncRefl.r-2az*hbeam)] (non-zero only for
+							 * p-polarization), expressing rc*exp(...) as t2-ctemp
+							 */
+							t3=2*(t2-ctemp);
+							b[j]-=t3*ex[0];
+							b[j+1]-=t3*ex[1];
+						}
 					}
 				}
 			}
 			else for (i=0;i<local_nvoid_Ndip;i++) { // standard (non-surface) plane wave
 				j=3*i;
-				LinComb(DipoleCoord+j,beam_center,1,-1,r1);
+				// can be replaced by complex multiplication (by precomputed phase factor), does not seem beneficial
+				vSubtr(DipoleCoord+j,beam_center,r1);
 				ctemp=imExp(WaveNum*DotProd(r1,prop)); // ctemp=exp(ik*r.a)
-				//ctemp=imExp(WaveNum*DotProd(DipoleCoord+j,prop)); // ctemp=exp(ik*r.a)
 				cvMultScal_RVec(ctemp,ex,b+j); // b[i]=ctemp*ex
 			}
 			return;
@@ -499,7 +510,7 @@ void GenerateB (const enum incpol which,   // x - or y polarized incident light
 			vMultScal(p0,prop,dip_p);
 			for (i=0;i<local_nvoid_Ndip;i++) { // here we explicitly use that dip_p is real
 				j=3*i;
-				LinComb(DipoleCoord+j,beam_center,1,-1,r1);
+				vSubtr(DipoleCoord+j,beam_center,r1);
 				(*InterTerm_real)(r1,gt);
 				cSymMatrVecReal(gt,dip_p,b+j);
 				if (surface) { // add reflected field
@@ -541,7 +552,7 @@ void GenerateB (const enum incpol which,   // x - or y polarized incident light
 			for (i=0;i<local_nvoid_Ndip;i++) {
 				j=3*i;
 				// set relative coordinates (in beam's coordinate system)
-				LinComb(DipoleCoord+j,beam_center,1,-1,r1);
+				vSubtr(DipoleCoord+j,beam_center,r1);
 				x=DotProd(r1,ex)*scale_x;
 				y=DotProd(r1,ey)*scale_x;
 				z=DotProd(r1,prop)*scale_z;
@@ -600,236 +611,240 @@ void GenerateB (const enum incpol which,   // x - or y polarized incident light
 				}
 			}
 			return;
-		case B_BESSELASD:
-			if (surface) {
-				/* With respect to normalization we use here the same assumption as in the free space - the origin is in
-				 * the particle center, and amplitude of incoming plane wave is equal to 1. Then irradiance of the beam
-				 * coming from below is c*Re(msub)/(8pi), different from that coming from above.
-				 * Original incident (incoming) beam propagating from the vacuum (above) is Exp(i*k*r.a), while - from
-				 * the substrate (below) is Exp(i*k*msub*r.a). We assume that the incoming beam is homogeneous in its
-				 * original medium.
-				 */
-				doublecomplex rcs,rcp,tcs,tcp; // reflection and transmission coefficients for s and p polarizations
+  case B_BESSELASD:
+    if (surface) {
+      /* With respect to normalization we use here the same assumption as in the free space - the origin is in
+       * the particle center, and amplitude of incoming plane wave is equal to 1. Then irradiance of the beam
+       * coming from below is c*Re(msub)/(8pi), different from that coming from above.
+       * Original incident (incoming) beam propagating from the vacuum (above) is Exp(i*k*r.a), while - from
+       * the substrate (below) is Exp(i*k*msub*r.a). We assume that the incoming beam is homogeneous in its
+       * original medium.
+       */
+      doublecomplex rcs,rcp,tcs,tcp; // reflection and transmission coefficients for s and p polarizations
 
-				for (i=0;i<local_nvoid_Ndip;i++) {
-					j=3*i;
-					b[j] = 0;
-					LinComb(DipoleCoord+j,beam_center,1,-1,r1);
-					x=DotProd(r1,ex);
-					y=DotProd(r1,ey);
-					z=DotProd(r1,prop);
-					r=sqrt(x*x+y*y+z*z);		// radial distance in a spherical coordinate system
-					tht=atan2(sqrt(x*x+y*y),z);	// polar angle
-					phi=atan2(y,x);				// azimuthal angle
+      for (i=0;i<local_nvoid_Ndip;i++) {
+        j=3*i;
+        b[j] = 0;
+        LinComb(DipoleCoord+j,beam_center,1,-1,r1);
+        x=DotProd(r1,ex);
+        y=DotProd(r1,ey);
+        z=DotProd(r1,prop);
+        r=sqrt(x*x+y*y+z*z);		// radial distance in a spherical coordinate system
+        tht=atan2(sqrt(x*x+y*y),z);	// polar angle
+        phi=atan2(y,x);				// azimuthal angle
 
-					// Integration
-					N=10;
-					db=2.*PI/N;
+        // Integration
+        N=10;
+        db=2.*PI/N;
 
-					for (it=0;it<N+1;it++) {
-						beta = it*db;
-						cvBuildRe(ex,exC);
-						cvBuildRe(ey,eyC);
-						cvBuildRe(prop,ezC);
-						cvLinComb(exC,eyC,cos(beta),sin(beta),blank);
-						cvLinComb(ezC,blank,-cos(alpha0),-sin(alpha0),epar);
-						cvLinComb(exC,eyC,sin(beta),-cos(beta),eper);
+        for (it=0;it<N+1;it++) {
+          beta = it*db;
+          cvBuildRe(ex,exC);
+          cvBuildRe(ey,eyC);
+          cvBuildRe(prop,ezC);
+          cvLinComb(exC,eyC,cos(beta),sin(beta),blank);
+          cvLinComb(ezC,blank,-cos(besAlpha),-sin(besAlpha),epar);
+          cvLinComb(exC,eyC,sin(beta),-cos(beta),eper);
 
-						Fpw(fint,n0,WaveNum,r,tht,phi,alpha0,beta);
+          Fpw(fint,besN,WaveNum,r,tht,phi,besAlpha,beta);
 
-						t4 = cDotProd(fint,eper);	// s- inc field
-						t5 = cDotProd(fint,epar);	// p- inc field
+          t4 = cDotProd(fint,eper);	// s- inc field
+          t5 = cDotProd(fint,epar);	// p- inc field
 
-						if (prop[2]>0) { // beam comes from the substrate (below)
-							//  determine amplitude of the reflected and transmitted waves; here msub is always defined
+          if (prop[2]>0) { // beam comes from the substrate (below)
+            //  determine amplitude of the reflected and transmitted waves; here msub is always defined
 
-							// s-polarized
-							cvBuildRe(eper,eIncRefls);
-							cvBuildRe(eper,eIncTrans);
-							rcs=FresnelRS(ki,kt);
-							tcs=FresnelTS(ki,kt);
-							// p-polarized
-							vInvRefl_cr(epar,eIncReflp);
-							crCrossProd(epar,ktVec,eIncTranp);
-							rcp=FresnelRP(ki,kt,1/msub);
-							tcp=FresnelTP(ki,kt,1/msub);
+            // s-polarized
+            cvBuildRe(eper,eIncRefls);
+            cvBuildRe(eper,eIncTrans);
+            rcs=FresnelRS(ki,kt);
+            tcs=FresnelTS(ki,kt);
+            // p-polarized
+            vInvRefl_cr(epar,eIncReflp);
+            crCrossProd(epar,ktVec,eIncTranp);
+            rcp=FresnelRP(ki,kt,1/msub);
+            tcp=FresnelTP(ki,kt,1/msub);
 
-							// phase shift due to the origin at height hsub
-							cvMultScal_cmplx(rcs*cexp(-2*I*WaveNum*ki*hsub)*t4,eIncRefls,eIncRefls);
-							cvMultScal_cmplx(rcp*cexp(-2*I*WaveNum*ki*hsub)*t5,eIncReflp,eIncReflp);
-							cvMultScal_cmplx(tcs*cexp(I*WaveNum*(kt-ki)*hsub)*t4,eIncTrans,eIncTrans);
-							cvMultScal_cmplx(tcp*cexp(I*WaveNum*(kt-ki)*hsub)*t5,eIncTranp,eIncTranp);
+            // phase shift due to the origin at height hsub
+            cvMultScal_cmplx(rcs*cexp(-2*I*WaveNum*ki*hsub)*t4,eIncRefls,eIncRefls);
+            cvMultScal_cmplx(rcp*cexp(-2*I*WaveNum*ki*hsub)*t5,eIncReflp,eIncReflp);
+            cvMultScal_cmplx(tcs*cexp(I*WaveNum*(kt-ki)*hsub)*t4,eIncTrans,eIncTrans);
+            cvMultScal_cmplx(tcp*cexp(I*WaveNum*(kt-ki)*hsub)*t5,eIncTranp,eIncTranp);
 
 
-							cvInit(eIncTran);
-							cvAdd2Self(eIncTran,eIncTrans,eIncTranp);
-							cvMultScal_cmplx(cexp(I*WaveNum*crDotProd(ktVec,DipoleCoord+j)),eIncTran,eIncTran);
-							nIncrem(b+j,eIncTran);
-						}
-						else if (prop[2]<0) { // beam comes from above the substrate
-							// determine amplitude of the reflected and transmitted waves
+            cvInit(eIncTran);
+            cvAdd2Self(eIncTran,eIncTrans,eIncTranp);
+            cvMultScal_cmplx(cexp(I*WaveNum*crDotProd(ktVec,DipoleCoord+j)),eIncTran,eIncTran);
+            nIncrem(b+j,eIncTran);
+          }
+          else if (prop[2]<0) { // beam comes from above the substrate
+            // determine amplitude of the reflected and transmitted waves
 
-							// s-polarized
-							cvBuildRe(eper,eIncRefls);
-							if (msubInf) {
-								rcs=-1;
-								tcs=0; // to remove compiler warnings
-							}
-							else {
-								cvBuildRe(eper,eIncTrans);
-								rcs=FresnelRS(ki,kt);
-								tcs=FresnelTS(ki,kt);
-							}
-							// p-polarized
-							vInvRefl_cr(epar,eIncReflp);
-							if (msubInf) {
-								rcp=1;
-								tcp=0; // to remove compiler warnings
-							}
-							else {
-								crCrossProd(epar,ktVec,eIncTranp);
-								cvMultScal_cmplx(1/msub,eIncTranp,eIncTranp); // normalize eIncTran by ||ktVec||=msub
-								rcp=FresnelRP(ki,kt,msub);
-								tcp=FresnelTP(ki,kt,msub);
-							}
+            // s-polarized
+            cvBuildRe(eper,eIncRefls);
+            if (msubInf) {
+              rcs=-1;
+              tcs=0; // to remove compiler warnings
+            }
+            else {
+              cvBuildRe(eper,eIncTrans);
+              rcs=FresnelRS(ki,kt);
+              tcs=FresnelTS(ki,kt);
+            }
+            // p-polarized
+            vInvRefl_cr(epar,eIncReflp);
+            if (msubInf) {
+              rcp=1;
+              tcp=0; // to remove compiler warnings
+            }
+            else {
+              crCrossProd(epar,ktVec,eIncTranp);
+              cvMultScal_cmplx(1/msub,eIncTranp,eIncTranp); // normalize eIncTran by ||ktVec||=msub
+              rcp=FresnelRP(ki,kt,msub);
+              tcp=FresnelTP(ki,kt,msub);
+            }
 
-							// phase shift due to the origin at height hsub
-							cvMultScal_cmplx(rcs*imExp(2*WaveNum*creal(ki)*hsub)*t4,eIncRefls,eIncRefls); // assumes real ki
-							cvMultScal_cmplx(rcp*imExp(2*WaveNum*creal(ki)*hsub)*t5,eIncReflp,eIncReflp); // assumes real ki
-							if (!msubInf) {
-								cvMultScal_cmplx(tcs*cexp(I*WaveNum*(ki-kt)*hsub)*t4,eIncTrans,eIncTrans);
-								cvMultScal_cmplx(tcp*cexp(I*WaveNum*(ki-kt)*hsub)*t5,eIncTranp,eIncTranp);
-							}
+            // phase shift due to the origin at height hsub
+            cvMultScal_cmplx(rcs*imExp(2*WaveNum*creal(ki)*hsub)*t4,eIncRefls,eIncRefls); // assumes real ki
+            cvMultScal_cmplx(rcp*imExp(2*WaveNum*creal(ki)*hsub)*t5,eIncReflp,eIncReflp); // assumes real ki
+            if (!msubInf) {
+              cvMultScal_cmplx(tcs*cexp(I*WaveNum*(ki-kt)*hsub)*t4,eIncTrans,eIncTrans);
+              cvMultScal_cmplx(tcp*cexp(I*WaveNum*(ki-kt)*hsub)*t5,eIncTranp,eIncTranp);
+            }
 
-							cvInit(eIncRefl);
-							cvAdd2Self(eIncRefl,eIncRefls,eIncReflp);
-							nIncrem(b+j,eIncRefl);
-							nIncrem(b+j,fint);
-						}
-					}
+            cvInit(eIncRefl);
+            cvAdd2Self(eIncRefl,eIncRefls,eIncReflp);
+            nIncrem(b+j,eIncRefl);
+            nIncrem(b+j,fint);
+          }
+        }
 
-				}
-			}
-			if (which==INCPOL_X) vort = cpow(I,n0);
-			else vort = 1.;
+      }
+    }
+    if (which==INCPOL_X) vort = cpow(I,besN);
+    else vort = 1.;
+    for (i=0;i<local_nvoid_Ndip;i++) {
+      j=3*i;
+      LinComb(DipoleCoord+j,beam_center,1,-1,r1);
+      x=DotProd(r1,ex);
+      y=DotProd(r1,ey);
+      z=DotProd(r1,prop);
+      r=sqrt(x*x+y*y+z*z);		// radial distance in a spherical coordinate system
+      tht=atan2(sqrt(x*x+y*y),z);	// polar angle
+      phi=atan2(y,x);				// azimuthal angle
+
+      // Integration
+      N=10;
+      db=2.*PI/N;
+
+      Fpw(fint,besN,WaveNum,r,tht,phi,besAlpha,0);
+      sum[0] = fint[0];	sum[1] = fint[1];	sum[2] = fint[2];
+
+      for (it=1;it<N;it++) {
+        Fpw(fint,besN,WaveNum,r,tht,phi,besAlpha,it*db);
+        sum[0] += fint[0];
+        sum[1] += fint[1];
+        sum[2] += fint[2];
+      }
+
+      t1=sum[0]/N;	t2=sum[1]/N;	t3=sum[2]/N;
+
+      cvMultScal_RVec(t1,ex,v1);
+      cvMultScal_RVec(t2,ey,v2);
+      cvMultScal_RVec(t3,prop,v3);
+      cvAdd2Self(v1,v2,v3);
+      cvMultScal_cmplx(vort,v1,b+j);
+    }
+#ifndef NO_FORTRAN
+		case B_BES_CS:
+		case B_BES_CSp:
+		case B_BES_M:
+		case B_BES_LE:
+		case B_BES_LM:
+		case B_BES_TEL:
+		case B_BES_TML:
+			/* we assume that matrix M determines x-polarization (in the beam reference frame), while y-one is obtained
+			 * by rotation with additional phase shift
+			 */
+			vort=(which==INCPOL_Y) ? cpow(I,besN) : 1;
 			for (i=0;i<local_nvoid_Ndip;i++) {
 				j=3*i;
-				LinComb(DipoleCoord+j,beam_center,1,-1,r1);
+				vSubtr(DipoleCoord+j,beam_center,r1);
 				x=DotProd(r1,ex);
 				y=DotProd(r1,ey);
 				z=DotProd(r1,prop);
-				r=sqrt(x*x+y*y+z*z);		// radial distance in a spherical coordinate system
-				tht=atan2(sqrt(x*x+y*y),z);	// polar angle
-				phi=atan2(y,x);				// azimuthal angle
-
-				// Integration
-				N=10;
-				db=2.*PI/N;
-
-				Fpw(fint,n0,WaveNum,r,tht,phi,alpha0,0);
-				sum[0] = fint[0];	sum[1] = fint[1];	sum[2] = fint[2];
-
-				for (it=1;it<N;it++) {
-					Fpw(fint,n0,WaveNum,r,tht,phi,alpha0,it*db);
-					sum[0] += fint[0];
-					sum[1] += fint[1];
-					sum[2] += fint[2];
-				}
-
-				t1=sum[0]/N;	t2=sum[1]/N;	t3=sum[2]/N;
-
-				cvMultScal_RVec(t1,ex,v1);
-				cvMultScal_RVec(t2,ey,v2);
-				cvMultScal_RVec(t3,prop,v3);
-				cvAdd2Self(v1,v2,v3);
-				cvMultScal_cmplx(vort,v1,b+j);
-			}
-			return;
-		case B_BESSELCS:
-		case B_BESSELCSp:
-		case B_BESSELM:
-		case B_BESSELLE:
-		case B_BESSELLM:
-		case B_BESSELTEL:
-		case B_BESSELTML:
-			if (which==INCPOL_X) vort = cpow(I,n0);
-			else vort = 1.;
-			for (i=0;i<local_nvoid_Ndip;i++) {
-				j=3*i;
-				LinComb(DipoleCoord+j,beam_center,1,-1,r1);
-				x=DotProd(r1,ex);
-				y=DotProd(r1,ey);
-				z=DotProd(r1,prop);
-				ro2=x*x+y*y;
-				ro=sqrt(ro2);	// radial distance in a cylindrical coordinate system
-				phi=atan2(y,x);	// angular coordinate in a cylindrical coordinate system
-				// common factor
-				ctemp=cexp(I*n0*phi)*cexp(I*Kz*z)/K/K*vort;
-				arg=Kt*ro;
-				if (arg<ROUND_ERR){
-					if (n0 == 0) fn[2]=1.;
+				phi=atan2(y,x); // angular coordinate in a cylindrical coordinate system
+				ctemp=imExp(besN*phi)*cexp(I*besKz*z)*vort/(WaveNum*WaveNum); // common factor
+				arg=besKt*sqrt(x*x+y*y); // argument of Bessel functions
+				if (arg<ROUND_ERR) {
+					// TODO: the following seems incorrect for n=+-1 or +-2 (other fn will be non-zero)
+					if (besN==0) fn[2]=1.;
 					else fn[2]=0;
-					fn[0]=0; fn[1]=0; fn[3]=0; fn[4]=0;
+					fn[0]=fn[1]=fn[3]=fn[4]=0;
 				}
 				else {
-					n1=abs(n0)+2;
-					if (n0 <= -3) {
-						bjndd_(&n1, &arg, jn1, td1, td2);
-						if (n1 % 2 == 0) q=1;	else q=-1;
-						fn[0] =  q*jn1[-n0+2]*cexp(-2*I*phi);
-						fn[1] = -q*jn1[-n0+1]*cexp(-I*phi);
-						fn[2] =  q*jn1[-n0];
-						fn[3] = -q*jn1[-n0-1]*cexp(I*phi);
-						fn[4] =  q*jn1[-n0-2]*cexp(2*I*phi);
+					// TODO: the following looks very complicated, try to simplify
+					n1=abs(besN)+2;
+					if (besN<=-3) {
+						bjndd_(&n1,&arg,jn1,td1,td2);
+						if (n1%2==0) q=1;
+						else q=-1;
+						fn[0] =  q*jn1[-besN+2]*imExp(-2*phi);
+						fn[1] = -q*jn1[-besN+1]*imExp(-phi);
+						fn[2] =  q*jn1[-besN];
+						fn[3] = -q*jn1[-besN-1]*imExp(phi);
+						fn[4] =  q*jn1[-besN-2]*imExp(2*phi);
 					}
-					if (n0 >= 2) {
-						bjndd_(&n1, &arg, jn1, td1, td2);
-						fn[0] = jn1[n0-2]*cexp(-2*I*phi);
-						fn[1] = jn1[n0-1]*cexp(-I*phi);
-						fn[2] = jn1[n0];
-						fn[3] = jn1[n0+1]*cexp(I*phi);
-						fn[4] = jn1[n0+2]*cexp(2*I*phi);
+					if (besN >= 2) {
+						bjndd_(&n1,&arg,jn1,td1,td2);
+						fn[0] = jn1[besN-2]*imExp(-2*phi);
+						fn[1] = jn1[besN-1]*imExp(-phi);
+						fn[2] = jn1[besN];
+						fn[3] = jn1[besN+1]*imExp(phi);
+						fn[4] = jn1[besN+2]*imExp(2*phi);
 					}
-					if (n0 == -2) {
-						bjndd_(&n1, &arg, jn1, td1, td2);
-						fn[0] =  jn1[4]*cexp(-2*I*phi);
-						fn[1] = -jn1[3]*cexp(-I*phi);
+					if (besN == -2) {
+						bjndd_(&n1,&arg,jn1,td1,td2);
+						fn[0] =  jn1[4]*imExp(-2*phi);
+						fn[1] = -jn1[3]*imExp(-phi);
 						fn[2] =  jn1[2];
-						fn[3] = -jn1[1]*cexp(I*phi);
-						fn[4] =  jn1[0]*cexp(2*I*phi);
+						fn[3] = -jn1[1]*imExp(phi);
+						fn[4] =  jn1[0]*imExp(2*phi);
 					}
-					if (n0 == -1) {
-						bjndd_(&n1, &arg, jn1, td1, td2);
-						fn[0] = -jn1[3]*cexp(-2*I*phi);
-						fn[1] =  jn1[2]*cexp(-I*phi);
+					if (besN == -1) {
+						bjndd_(&n1,&arg,jn1,td1,td2);
+						fn[0] = -jn1[3]*imExp(-2*phi);
+						fn[1] =  jn1[2]*imExp(-phi);
 						fn[2] = -jn1[1];
-						fn[3] =  jn1[0]*cexp(I*phi);
-						fn[4] =  jn1[1]*cexp(2*I*phi);
+						fn[3] =  jn1[0]*imExp(phi);
+						fn[4] =  jn1[1]*imExp(2*phi);
 					}
-					if (n0 == 0) {
-						bjndd_(&n1, &arg, jn1, td1, td2);
-						fn[0] =  jn1[2]*cexp(-2*I*phi);
-						fn[1] = -jn1[1]*cexp(-I*phi);
+					if (besN == 0) {
+						bjndd_(&n1,&arg,jn1,td1,td2);
+						fn[0] =  jn1[2]*imExp(-2*phi);
+						fn[1] = -jn1[1]*imExp(-phi);
 						fn[2] =  jn1[0];
-						fn[3] =  jn1[1]*cexp(I*phi);
-						fn[4] =  jn1[2]*cexp(2*I*phi);
+						fn[3] =  jn1[1]*imExp(phi);
+						fn[4] =  jn1[2]*imExp(2*phi);
 					}
-					if (n0 == 1) {
-						bjndd_(&n1, &arg, jn1, td1, td2);
-						fn[0] = -jn1[1]*cexp(-2*I*phi);
-						fn[1] =  jn1[0]*cexp(-I*phi);
+					if (besN == 1) {
+						bjndd_(&n1,&arg,jn1,td1,td2);
+						fn[0] = -jn1[1]*imExp(-2*phi);
+						fn[1] =  jn1[0]*imExp(-phi);
 						fn[2] =  jn1[1];
-						fn[3] =  jn1[2]*cexp(I*phi);
-						fn[4] =  jn1[3]*cexp(2*I*phi);
+						fn[3] =  jn1[2]*imExp(phi);
+						fn[4] =  jn1[3]*imExp(2*phi);
 					}
 				}
-
-				t1 = (((K*K+Kz*Kz)/2.*M[0] +  K*Kz*M[3])*fn[2] +
-						  Kt*Kt/4.*((M[0]+I*M[1])*fn[0] + (M[0]-I*M[1])*fn[4]));	// Ex
-				t2 = (((K*K+Kz*Kz)/2.*M[1] -  K*Kz*M[2])*fn[2] +
-						I*Kt*Kt/4.*((M[0]+I*M[1])*fn[0] - (M[0]-I*M[1])*fn[4]));	// Ey
-				t3 = ((I*Kz*(M[0]+I*M[1]) + K*(M[2]+I*M[3]))*fn[1] -
-					  (I*Kz*(M[0]-I*M[1]) - K*(M[2]-I*M[3]))*fn[3])*Kt/2.;			// Ez
+				/* TODO: all factors before f[n] should be calculated in InitBeam beforehand
+				 * this will improve speed and allow robust calculation in the limit, e.g., of kt->0
+				 */
+				t1 = (((WaveNum*WaveNum+besKz*besKz)/2.*besM[0] +  WaveNum*besKz*besM[3])*fn[2] +
+					  besKt*besKt/4.*((besM[0]+I*besM[1])*fn[0] + (besM[0]-I*besM[1])*fn[4])); // Ex
+				t2 = (((WaveNum*WaveNum+besKz*besKz)/2.*besM[1] -  WaveNum*besKz*besM[2])*fn[2] +
+					  I*besKt*besKt/4.*((besM[0]+I*besM[1])*fn[0] - (besM[0]-I*besM[1])*fn[4])); // Ey
+				t3 = ((I*besKz*(besM[0]+I*besM[1]) + WaveNum*(besM[2]+I*besM[3]))*fn[1] -
+					  (I*besKz*(besM[0]-I*besM[1]) - WaveNum*(besM[2]-I*besM[3]))*fn[3])*besKt/2.; // Ez
 
 				cvMultScal_RVec(t1,ex,v1);
 				cvMultScal_RVec(t2,ey,v2);
@@ -838,6 +853,7 @@ void GenerateB (const enum incpol which,   // x - or y polarized incident light
 				cvMultScal_cmplx(ctemp,v1,b+j);
 			}
 			return;
+#endif // !NO_FORTRAN
 		case B_READ:
 			if (which==INCPOL_Y) fname=beam_fnameY;
 			else fname=beam_fnameX; // which==INCPOL_X
@@ -849,12 +865,12 @@ void GenerateB (const enum incpol which,   // x - or y polarized incident light
 	 * add a case above. Identifier ('B_...') should be defined inside 'enum beam' in const.h. This case should set
 	 * complex vector 'b', describing the incident field in the particle reference frame. It is set inside the cycle for
 	 * each dipole of the particle and is calculated using
-	 * 1) 'DipoleCoord' � array of dipole coordinates;
-	 * 2) 'prop' � propagation direction of the incident field;
-	 * 3) 'ex' � direction of incident polarization;
-	 * 4) 'ey' � complementary unity vector of polarization (orthogonal to both 'prop' and 'ex');
-	 * 5) 'beam_center' � beam center in the particle reference frame (automatically calculated from 'beam_center_0'
-	 *                    defined in InitBeam).
+	 * 1) 'DipoleCoord' - array of dipole coordinates;
+	 * 2) 'prop' - propagation direction of the incident field;
+	 * 3) 'ex' - direction of incident polarization;
+	 * 4) 'ey' - complementary unity vector of polarization (orthogonal to both 'prop' and 'ex');
+	 * 5) 'beam_center' - beam center in the particle reference frame (automatically calculated from 'beam_center_0'
+	 *                    defined by '-beam_center' command line option).
 	 * If the new beam type is compatible with '-surf', include here the corresponding code. For that you will need
 	 * the variables, related to surface - see vars.c after "// related to a nearby surface".
 	 * If you need temporary local variables (which are used only in this part of the code), either use 't1'-'t8' or
