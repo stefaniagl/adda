@@ -10,20 +10,9 @@ from matplotlib import rc
 from PIL import Image
 
 
-
-# ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION
-# Define these two paths:
-
 # path to adda executable
-addaexec = '../../src/seq/./adda'
-'''
-# path to adda executable
-addaexec = '/Users/stefaniaglukhova/Documents/GitHub/adda/src/seq/./adda'
-# path to the folder with this python code 
-save_path = '/Users/stefaniaglukhova/Yandex.Disk.localized/job/run_ADDA_python/run_adda_compare'
-'''
-# ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION
-
+#adda_exec = "../../win64/adda.exe"
+adda_exec = os.path.abspath(__file__ + "/../../../src/seq/adda")
 
 
 option = 1 # 0 - scattering by a sphere; 1 - scattering by a coated sphere
@@ -53,7 +42,7 @@ def adda_run(mode): # option 0 or 1
                    ]                                                               
     
     # cmd line generation (see ADDA manual)
-    cmdline = addaexec
+    cmdline = adda_exec
     cmdline += ' -sym enf' #Do not simulate second polarization
     cmdline += ' -ntheta 180'
     cmdline += run_options[mode]
@@ -217,9 +206,11 @@ plotData(dda_theta,dda_iper,ref_thetaper,ref_iper,1)
 ax = fig.add_subplot(224)
 plotData(dda_theta,dda_ipar,ref_thetapar,ref_ipar,2)
 
+plt.tight_layout()
+
 
 # data save
-plt.tight_layout()
+os.makedirs('saved', exist_ok=True)
 if option == 0:
     plt.savefig('saved/BB_sphere.pdf', bbox_inches='tight')
 if option == 1:
