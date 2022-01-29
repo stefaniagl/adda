@@ -1,7 +1,6 @@
 '''
-# This code represents the comparison of scattering intensities calculated with GLMT (reference data) and DDA (with ADDA)
-# for the scattering of Bessel beam (CS type) by a sphere (option 0) and coated sphere (option 1).
-# Reference data were kindly provided by Zhuyang Chen (DOI:10.1088/2040-8978/16/5/055701).
+# This code represents the comparison of scattering intensities calculated with DDA (ADDA code)
+# for the scattering of Bessel beam of 2 options by choice (option_1 and option_2).
 '''
 
 import os, re, math
@@ -15,42 +14,26 @@ from PIL import Image
 adda_exec = os.path.abspath(__file__ + "/../../../src/seq/adda")
 
 
-option = 1 # 0 - scattering by a sphere; 1 - scattering by a coated sphere
-
-
-
-# Bessel beam parameters
-angle = 15 # half-cone angle
-lmbd = 0.6328 # beam wavelenght
-
-# particle parameters
-eq_rad = lmbd # sphere diameter
-grid = 32 # number of dipoles per particle length (see ADDA manual)
-
-run = 1 # 1 - run ADDA code; other - do not run ADDA code
-
+# define here different parameters for 2 options (see ADDA manual)
+run_options = [' -beam besselLE  2 15',  # option 1
+               ' -beam besselLM  2 15']  # option 2
+                                                                              
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Data generation (run of ADDA code)
-def adda_run(mode): # option 0 or 1
-    
-    # Beam and particle definition
-
-    run_options = [' -beam besselCS 0 ' + str(angle) + ' -shape coated 0.5 -m 1.33 0 1.33 0', # option 0 - sphere
-                   ' -beam besselCS 0 ' + str(angle) + ' -shape coated 0.5 -m 1.33 0 1.55 0'  # option 1 - coated sphere
-                   ]                                                               
+# data generation (run of ADDA code)
+def adda_run(mode): # option 1 or 2                                                             
     
     # cmd line generation (see ADDA manual)
+    
+    # common parameters for 2 options
     cmdline = adda_exec
-    cmdline += ' -sym enf' #Do not simulate second polarization
-    cmdline += ' -ntheta 180'
-    cmdline += run_options[mode]
-    cmdline += ' -lambda ' + str(lmbd)
-    cmdline += ' -store_beam'
-    cmdline += ' -eq_rad ' + str(eq_rad)
-    cmdline += ' -grid ' + str(grid)
-    cmdline += ' -dir dda/option_' + str(mode)
+    cmdline += ' -grid 16' # particle discretization
+    cmdline += ' -sym enf' # do not simulate second polarization
+    cmdline += ' -ntheta 180' # number of scattering angles
+    cmdline += ' -store_beam' # save incident field
+    cmdline += ' -dir option_' + str(mode) # save path
+    cmdline += run_options[mode-1]
     print(cmdline)
     
     os.system(cmdline)
@@ -61,32 +44,7 @@ def adda_run(mode): # option 0 or 1
 
 # data extraction
 def extractData(mode):
-    if mode == 'glmt':
-        # Reference data (Generalized Lorenz Mie Theory)
-        ref_path = 'ref/glmt/option_' + str(option) + '/'
-        files_ref = os.listdir(ref_path)
-        # Scattering in perpendicular plane
-        with open(ref_path + str(files_ref[files_ref.index('glmt1.txt')])) as f:
-            file_ref = f.read()
-        f.close()
-        dat_ref = re.split('[\n \t]',file_ref)
-        theta_per = dat_ref[0:-1:2]
-        theta_per = [float(i) for i in theta_per]
-        i_per = dat_ref[1::2]
-        i_per = [math.pi*pow(10,float(i)/10) for i in i_per]
-        # Scattering in parallel plane
-        with open(ref_path + str(files_ref[files_ref.index('glmt2.txt')])) as f:
-            file_ref = f.read()
-        f.close()
-        dat_ref = re.split('[\n \t]',file_ref)
-        theta_par = dat_ref[0:-1:2]
-        theta_par = [float(i) for i in theta_par]
-        i_par = dat_ref[1::2]
-        i_par = [math.pi*pow(10,float(i)/10) for i in i_par]
-        
-        return theta_per,i_per,theta_par,i_par
-    
-    path = 'dda/option_' + str(mode)
+    path = 'option_' + str(mode)
     files = os.listdir(path)
     with open(path + '/' + str(files[files.index('mueller')])) as f:
         fileM = f.read()
@@ -129,8 +87,8 @@ def extractData(mode):
 # plots of scattering intensities
 def plotData(xv1,yv1,xv2,yv2,flag):
     rc('font',**{'family':'sans-serif','sans-serif':['Arial']})
-    plt.plot(xv1, yv1, label = 'DDA', color = (0.5, 0.7, 0.9))
-    plt.plot(xv2, yv2, label = 'GLMT', color = 'm',linestyle='dashed')
+    plt.plot(xv1, yv1, label = 'option 1', color = (0.5, 0.7, 0.9))
+    plt.plot(xv2, yv2, label = 'option 2', color = 'm',linestyle='dashed')
     plt.minorticks_on()
     plt.tick_params(which='major',right=True, top=True)
     plt.tick_params(which='minor',right=True, top=True)
@@ -158,19 +116,10 @@ def plotData(xv1,yv1,xv2,yv2,flag):
     return 0
 
 
-# images of the scattering particle shape
-def plotShape(size):
-    ax.set_title(r'D = ' + str(size) + ' $\mu m$')
-    img = Image.open('dda/option_'+str(option)+'/shape_image.png')
-    ax.set_axis_off()
-    ax.imshow(img)
-    
-    return 0
-
 # Visualisation of the amplitude of the incident electric field almost in the middle
 # of the particle (z = distance to the closest dipole along z axis)
-def plotField(xd,yd,ed,z0):
-    ax.set_title('Amplitude of the incident field \n(z = '+str(round(z0,2))+')');
+def plotField(xd,yd,ed,z0,mode):
+    ax.set_title('OPTION '+str(mode)+'\nAmplitude of the incident field \n(z = '+str(round(z0,2))+')');
     ax.scatter(xd, yd, ed, c=ed, cmap='viridis', linewidth=0.5);
     #ax.plot_trisurf(xd, yd, ed,cmap='viridis', edgecolor='none');
     ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
@@ -182,39 +131,36 @@ def plotField(xd,yd,ed,z0):
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-# whether run ADDA code or not
-if run == 1:
-    adda_run(option)
+adda_run(1)
+adda_run(2)
     
-dda_theta,dda_iper,dda_ipar,dda_xd,dda_yd,dda_ed,dda_z0 = extractData(option) # extraction of ADDA results
-ref_thetaper,ref_iper,ref_thetapar,ref_ipar = extractData('glmt') # extraction of reference data (GLMT)
+theta_1,iper_1,ipar_1,xd_1,yd_1,ed_1,z0_1 = extractData(1) # extraction of ADDA results for option 1
+theta_2,iper_2,ipar_2,xd_2,yd_2,ed_2,z0_2 = extractData(2) # extraction of ADDA results for option 2
 
 
 # data visualisation
 
 fig = plt.figure()
-# Image of particle shape
-ax = fig.add_subplot(221)
-plotShape(eq_rad*2)
-# Visualisation of the amplitude of the incident electric field
+# Visualisation of the amplitude of the incident electric field for option 1
+ax = fig.add_subplot(221,projection='3d')
+plotField(xd_1,yd_1,ed_1,z0_1,1)
+# Visualisation of the amplitude of the incident electric field for option 2
 ax = fig.add_subplot(222,projection='3d')
-plotField(dda_xd,dda_yd,dda_ed,dda_z0)
+plotField(xd_2,yd_2,ed_2,z0_2,2)
 # Perpendicular scattering intensity (1)
 ax = fig.add_subplot(223)
-plotData(dda_theta,dda_iper,ref_thetaper,ref_iper,1)
+plotData(theta_1,iper_1,theta_2,iper_2,1)
 # Parallel scattering intensity (2)
 ax = fig.add_subplot(224)
-plotData(dda_theta,dda_ipar,ref_thetapar,ref_ipar,2)
+plotData(theta_1,ipar_1,theta_2,ipar_2,2)
 
 plt.tight_layout()
 
 
 # data save
 os.makedirs('saved', exist_ok=True)
-if option == 0:
-    plt.savefig('saved/BB_sphere.pdf', bbox_inches='tight')
-if option == 1:
-    plt.savefig('saved/BB_coatedsphere.pdf', bbox_inches='tight')
-    
-    
+
+plt.savefig('saved/option_1.pdf', bbox_inches='tight')
+plt.savefig('saved/option_2.pdf', bbox_inches='tight')
+        
 plt.show()

@@ -1,6 +1,2 @@
-This python code "bb_examples" represents the comparison of scattering
-intensities calculated with GLMT (reference data) and DDA (with ADDA) for the
-scattering of Bessel beam (CS type) by a sphere (option 0) and coated sphere
-(option 1).
-
-Reference data were kindly provided by Zhuyang Chen (DOI:10.1088/2040-8978/16/5/055701).
+This python code "bb_examples" represents the comparison of scattering intensities calculated with DDA (ADDA code)
+for the scattering of Bessel beam of 2 options by choice (option_1 and option_2).
