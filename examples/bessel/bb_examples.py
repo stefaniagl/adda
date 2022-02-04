@@ -160,7 +160,6 @@ plt.tight_layout()
 # data save
 os.makedirs('saved', exist_ok=True)
 
-plt.savefig('saved/option_1.pdf', bbox_inches='tight')
-plt.savefig('saved/option_2.pdf', bbox_inches='tight')
+plt.savefig('saved/results.pdf', bbox_inches='tight')
         
 plt.show()
