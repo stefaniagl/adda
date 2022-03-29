@@ -1,12 +1,11 @@
 '''
-# This code represents the comparison of scattering intensities calculated with DDA (ADDA code)
-# for the scattering of Bessel beam of 2 options by choice (option_1 and option_2).
+# This code compares the scattering intensities calculated with the DDA (ADDA code)
+# for the scattering of two different Bessel beams (option_1 and option_2) by a sphere.
 '''
 
 import os, re, math
 import matplotlib.pyplot as plt
 from matplotlib import rc
-from PIL import Image
 
 
 # path to adda executable
@@ -17,15 +16,39 @@ adda_exec = os.path.abspath(__file__ + "/../../../src/seq/adda")
 # define here different parameters for 2 options (see ADDA manual)
 run_options = [' -beam besselLE  2 15',  # option 1
                ' -beam besselLM  2 15']  # option 2
-                                                                              
+
+# =============================================================================
+# Bessel beams in ADDA:
+#
+#   besselCS <order> <angle>
+#       -Bessel beam with circularly symmetric energy density.
+#   besselCSp <order> <angle>
+#       -Alternative Bessel beam with circularly symmetric energy density.
+#   besselM <order> <angle> <ReMex> <ReMey> <ReMmx> <ReMmy> [<ImMex> <ImMey> <ImMmx> <ImMmy>]
+#       -Generalized Bessel beam. The beam is defined by 2x2 matrix M:
+#       (Mex, Mey, Mmx, Mmy). Real parts of these four elements are obligatory,
+#       while imaginary parts are optional (zero, by default).
+#   besselLE <order> <angle>
+#       -Bessel beam with linearly polarized electric field.
+#   besselLM <order> <angle>
+#       -Bessel beam with linearly polarized magnetic field.
+#   besselTEL <order> <angle>
+#       -Linear component of the TE Bessel beam.
+#   besselTML <order> <angle>
+#       -Linear component of the TM Bessel beam.
+#
+#   Order is integer (of any sign) and the half-cone angle (in degrees)
+#   is measured from the z-axis.
+# =============================================================================
+
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # data generation (run of ADDA code)
-def adda_run(mode): # option 1 or 2                                                             
-    
+def adda_run(mode): # option 1 or 2
+
     # cmd line generation (see ADDA manual)
-    
+
     # common parameters for 2 options
     cmdline = adda_exec
     cmdline += ' -grid 16' # particle discretization
@@ -35,10 +58,8 @@ def adda_run(mode): # option 1 or 2
     cmdline += ' -dir option_' + str(mode) # save path
     cmdline += run_options[mode-1]
     print(cmdline)
-    
+
     os.system(cmdline)
-        
-    return 0
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -53,7 +74,7 @@ def extractData(mode):
     theta = dat[17:-1:17]
     s11 = dat[18:-1:17]
     s12 = dat[19:-1:17]
-    
+
     with open(path + '/' + str(files[files.index('IncBeam-Y')])) as f:
         fileF = f.read()
     f.close()
@@ -62,7 +83,7 @@ def extractData(mode):
     yd = dat[11:-1:10]
     zd = dat[12:-1:10]
     ed = dat[13:-1:10]
-    
+
     theta = [float(th) for th in theta]
     s11 = [float(s) for s in s11]
     s12 = [float(s) for s in s12]
@@ -77,7 +98,7 @@ def extractData(mode):
     xd = [xd[i] for i in zslice]
     yd = [yd[i] for i in zslice]
     ed = [ed[i] for i in zslice]
-    
+
     return theta,i_per,i_par,xd,yd,ed,minz
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -112,28 +133,24 @@ def plotData(xv1,yv1,xv2,yv2,flag):
     print(sum(dev)/len(dev))
     print('RMS, %:')
     print(math.sqrt(sum(dev2)/len(xv2)*100))
-    
-    return 0
 
 
 # Visualisation of the amplitude of the incident electric field almost in the middle
-# of the particle (z = distance to the closest dipole along z axis)
+# of the particle (the nearest to the center xy-plane of dipoles is used, its z-coordinate is shown on the plot)
 def plotField(xd,yd,ed,z0,mode):
-    ax.set_title('OPTION '+str(mode)+'\nAmplitude of the incident field \n(z = '+str(round(z0,2))+')');
+    ax.set_title(r'OPTION '+str(mode)+':\n '+run_options[mode-1]+'\nIntensity profile of $|E_{inc}|^2$\n(z = '+str(round(z0,2))+')');
     ax.scatter(xd, yd, ed, c=ed, cmap='viridis', linewidth=0.5);
     #ax.plot_trisurf(xd, yd, ed,cmap='viridis', edgecolor='none');
     ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
     ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
     ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
-    
-    return 0
-    
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 adda_run(1)
 adda_run(2)
-    
+
 theta_1,iper_1,ipar_1,xd_1,yd_1,ed_1,z0_1 = extractData(1) # extraction of ADDA results for option 1
 theta_2,iper_2,ipar_2,xd_2,yd_2,ed_2,z0_2 = extractData(2) # extraction of ADDA results for option 2
 
@@ -161,5 +178,5 @@ plt.tight_layout()
 os.makedirs('saved', exist_ok=True)
 
 plt.savefig('saved/results.pdf', bbox_inches='tight')
-        
+
 plt.show()
