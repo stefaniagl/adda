@@ -7,15 +7,15 @@ import os,shutil,re,math
 
 
 
-fdiff = 1e-10 # fixed difference
+fdiff = 1e-8 # fixed relative difference
 
 
 # path to adda executable
 #adda_exec = "../../win64/adda.exe"
 adda_exec = os.path.abspath(__file__ + "/../../../src/seq/adda")
-dirname = 'out'    
+dirname = 'out'
 
-                                                                    
+
 
 def extractCrosSeq(mode,pol):
     dname = dirname + str(mode)
@@ -28,12 +28,12 @@ def extractCrosSeq(mode,pol):
     Qext = float(dat[5])
     Cabs = float(dat[8])
     Qabs = float(dat[11])
-    
+
     return Cext,Qext,Cabs,Qabs
 
 
 # data generation (run of ADDA code)
-def adda_run(mode,option):                                                            
+def adda_run(mode,option):
     dname = dirname + str(mode)
     #os.makedirs(dname, exist_ok=True)
     cmdline = adda_exec + ' -dir ' + dname + option + ' > ' + os.devnull
@@ -42,7 +42,7 @@ def adda_run(mode,option):
 
 # print difference
 def printdiff(val,x,y):
-    cdiff = math.fabs(x-y) # calculated difference
+    cdiff = math.fabs((x-y)/y) # calculated relative difference
     if (cdiff > fdiff):
         fr.write('\n\t\t'+val + ':\n\t\tcase 1:\t'+str(x)+'\n\t\tcase 2:\t'+str(y)+'\n\t\tdiff:\t'+str(cdiff)+'\n')
         return 1
@@ -63,10 +63,10 @@ def printsearch(pol):
 
 
 def compare(line1,line2):
-    
+
     adda_run(1,line1)
     adda_run(2,line2)
-    
+
     print('\nCompare:\n'+line1+'\n'+line2)
     fr.write('\n\nCompare:\n'+line1+'\n'+line2)
     dtotal = 0
@@ -77,11 +77,11 @@ def compare(line1,line2):
     else:
         print('\033[31m', '\nNot passed (see bb_results.txt)', '\033[0m', sep='') #red
     fr.write('\n\nDone\n___')
-    
+
     shutil.rmtree('out1')
     shutil.rmtree('out2')
 
-    
+
 fname = "bb_results.txt"
 fr = open(fname, "w")
 fr.write("The comparison of equivalent cases (command lines) \nfor the scattering of Bessel beams calculated in ADDA.")
@@ -109,7 +109,7 @@ opt1 = ' -sym no'
 opt2 = ' -beam besselCS 0 0'
 compare(opt1,opt2)
 
-al1 = 5
+al1 = 2
 al2 = 85
 
 print('\n\nGeneralized and LE Bessel beams')
