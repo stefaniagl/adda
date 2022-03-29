@@ -3,7 +3,7 @@
 # for the scattering of two different Bessel beams (option_1 and option_2) by a sphere.
 '''
 
-import os, re, math
+import os, shutil, re, math
 import matplotlib.pyplot as plt
 from matplotlib import rc
 
@@ -12,10 +12,12 @@ from matplotlib import rc
 #adda_exec = "../../win64/adda.exe"
 adda_exec = os.path.abspath(__file__ + "/../../../src/seq/adda")
 
+comm = ' -surf 5. 1.33 0'
+
 
 # define here different parameters for 2 options (see ADDA manual)
-run_options = [' -beam besselASD  2 15',  # option 1
-               ' -beam besselASD  2 15 -surf 5. 1.33 0']  # option 2
+run_options = [comm,  # option 1
+               comm + ' -beam besselASD  2 15']  # option 2
 
 # =============================================================================
 # Bessel beams in ADDA:
@@ -45,13 +47,16 @@ run_options = [' -beam besselASD  2 15',  # option 1
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # data generation (run of ADDA code)
-def adda_run(mode): # option 1 or 2                                                             
+def adda_run(mode): # option 1 or 2          
+
+    if os.path.exists('dda/option_' + str(mode)):
+        shutil.rmtree('dda/option_' + str(mode))                                                   
     
     # cmd line generation (see ADDA manual)
     
     # common parameters for 2 options
     cmdline = adda_exec
-    cmdline += ' -grid 8' # particle discretization
+    cmdline += ' -grid 16' # particle discretization
     cmdline += ' -sym enf' # do not simulate second polarization
     cmdline += ' -ntheta 180' # number of scattering angles
     cmdline += ' -store_beam' # save incident field
@@ -137,33 +142,33 @@ def plotData(xv1,yv1,xv2,yv2,flag):
 
 # Visualisation of the amplitude of the incident electric field almost in the middle
 # of the particle (the nearest to the center xy-plane of dipoles is used, its z-coordinate is shown on the plot)
-def plotField(xd,yd,ed,z0,mode):
+def plotField(xd,yd,ed,z0,mode,ax):
     ax.set_title(r'OPTION '+str(mode)+':\n '+run_options[mode-1]+'\nIntensity profile of $|E_{inc}|^2$\n(z = '+str(round(z0,2))+')');
     ax.scatter(xd, yd, ed, c=ed, cmap='viridis', linewidth=0.5);
-    #ax.plot_trisurf(xd, yd, ed,cmap='viridis', edgecolor='none');
     ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
     ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
     ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    #ax.axis('off')
 
     
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 adda_run(1)
 adda_run(2)
-'''    
+
 theta_1,iper_1,ipar_1,xd_1,yd_1,ed_1,z0_1 = extractData(1) # extraction of ADDA results for option 1
 theta_2,iper_2,ipar_2,xd_2,yd_2,ed_2,z0_2 = extractData(2) # extraction of ADDA results for option 2
 
 
 # data visualisation
 
-fig = plt.figure()
+fig = plt.figure(figsize=(9,6))
 # Visualisation of the amplitude of the incident electric field for option 1
 ax = fig.add_subplot(221,projection='3d')
-plotField(xd_1,yd_1,ed_1,z0_1,1)
+plotField(xd_1,yd_1,ed_1,z0_1,1,ax)
 # Visualisation of the amplitude of the incident electric field for option 2
 ax = fig.add_subplot(222,projection='3d')
-plotField(xd_2,yd_2,ed_2,z0_2,2)
+plotField(xd_2,yd_2,ed_2,z0_2,2,ax)
 # Perpendicular scattering intensity (1)
 ax = fig.add_subplot(223)
 plotData(theta_1,iper_1,theta_2,iper_2,1)
@@ -180,4 +185,3 @@ os.makedirs('saved', exist_ok=True)
 plt.savefig('saved/results.pdf', bbox_inches='tight')
         
 plt.show()
-'''
