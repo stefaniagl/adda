@@ -688,6 +688,16 @@ static inline doublecomplex FresnelTP(const doublecomplex ki,const doublecomplex
 	return 2*mr*ki/(mr*mr*ki+kt);
 }
 
+//======================================================================================================================
+
+static inline void vEulerRotation(const double a,const double b,const double g,const double v0[static 3],double v1[static 3])
+// rotate vector on Euler angles a, b, g; v1=R.v0
+{
+	v1[0]=cos(g)*v0[0]+(-cos(b)*v0[1]+sin(b)*v0[2])*sin(g);
+	v1[1]=cos(b)*cos(g)*v0[1]-cos(g)*sin(b)*v0[2]+sin(g)*v0[0];
+	v1[2]=cos(b)*v0[2]+sin(b)*v0[1];
+}
+
 #ifdef USE_SSE3
 
 //======================================================================================================================
