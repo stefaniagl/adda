@@ -12,12 +12,24 @@ from matplotlib import rc
 #adda_exec = "../../win64/adda.exe"
 adda_exec = os.path.abspath(__file__ + "/../../../src/seq/adda")
 
-comm = ' -surf 5. 1.33 0'
+# =============================================================================
+# comm = ' -size 10 -prop 0 0 1 -beam besselASD 2 15 '
+# # define here different parameters for 2 options (see ADDA manual)
+# run_options = [comm + ' ',  # option 1
+#                comm + ' -surf 5 1.0001 0 ']  # option 2
+# =============================================================================
 
+# =============================================================================
+# comm = ' -size 2 -prop 0.01 0.01 3 -surf 1 1.5 0 '
+# # define here different parameters for 2 options (see ADDA manual)
+# run_options = [comm + ' ',  # option 1
+#                comm + ' -beam besselASD 0 0 ']  # option 2
+# =============================================================================
 
+comm = ' -size 10 -prop 2 3 -1  '
 # define here different parameters for 2 options (see ADDA manual)
-run_options = [comm,  # option 1
-               comm + ' -beam besselASD  2 15']  # option 2
+run_options = [comm + ' -beam besselCS  2 15 ',  # option 1
+               comm + ' -beam besselASD 2 15 -surf 5 1.000001 0 ']  # option 2
 
 # =============================================================================
 # Bessel beams in ADDA:
@@ -49,15 +61,15 @@ run_options = [comm,  # option 1
 # data generation (run of ADDA code)
 def adda_run(mode): # option 1 or 2          
 
-    if os.path.exists('dda/option_' + str(mode)):
-        shutil.rmtree('dda/option_' + str(mode))                                                   
+    if os.path.exists('option_' + str(mode)):
+        shutil.rmtree('option_' + str(mode))                                                   
     
     # cmd line generation (see ADDA manual)
     
     # common parameters for 2 options
     cmdline = adda_exec
-    cmdline += ' -grid 16' # particle discretization
-    cmdline += ' -sym enf' # do not simulate second polarization
+    cmdline += ' -grid 15 -shape box ' # particle discretization
+    #cmdline += ' -sym enf' # do not simulate second polarization
     cmdline += ' -ntheta 180' # number of scattering angles
     cmdline += ' -store_beam' # save incident field
     cmdline += ' -dir option_' + str(mode) # save path
@@ -112,6 +124,9 @@ def extractData(mode):
 
 # plots of scattering intensities
 def plotData(xv1,yv1,xv2,yv2,flag):
+    
+    #yv2=yv2[::-1]
+    
     rc('font',**{'family':'sans-serif','sans-serif':['Arial']})
     plt.plot(xv1, yv1, label = 'option 1', color = (0.5, 0.7, 0.9))
     plt.plot(xv2, yv2, label = 'option 2', color = 'm',linestyle='dashed')

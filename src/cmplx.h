@@ -312,13 +312,12 @@ static inline double crDotProd_Re(const doublecomplex a[static 3],const double b
 
 //======================================================================================================================
 
-static inline void cvLinComb(const doublecomplex a[static 3],const doublecomplex b[static 3],const double c1, const double c2,
-	doublecomplex c[static 3])
-// linear combination of complex vectors[3] with real coefficient; second coefficient is unity; c=c1*a+b
+static inline void cvBasisChange(const double ex[static 3],const double ey[static 3],const double ez[static 3],const doublecomplex v0[static 3],doublecomplex v1[static 3])
+// v1=v0x*ex+v0y*ey+v0z*ez !!! vec and res must not alias
 {
-	c[0] = c1*a[0] + c2*b[0];
-	c[1] = c1*a[1] + c2*b[1];
-	c[2] = c1*a[2] + c2*b[2];
+	v1[0] = v0[0]*ex[0] + v0[1]*ey[0] + v0[2]*ez[0];
+	v1[1] = v0[0]*ex[1] + v0[1]*ey[1] + v0[2]*ez[1];
+	v1[2] = v0[0]*ex[2] + v0[1]*ey[2] + v0[2]*ez[2];
 }
 
 //======================================================================================================================
@@ -542,6 +541,17 @@ static inline void LinComb(const double a[static 3],const double b[static 3],con
 
 //======================================================================================================================
 
+static inline void LinComb3(const double a[static 3],const double b[static 3],const double c[static 3],const double c1,const double c2,const double c3,
+	double d[static 3])
+// linear combination of real vectors[3]; c=c1*a+c2*b
+{
+	d[0]=c1*a[0]+c2*b[0]+c3*c[0];
+	d[1]=c1*a[1]+c2*b[1]+c3*c[1];
+	d[2]=c1*a[2]+c2*b[2]+c3*c[2];
+}
+
+//======================================================================================================================
+
 static inline void OuterSym(const double a[static 3],double matr[static 6])
 // outer product of real vector a with itself, stored in symmetric matrix matr
 {
@@ -691,11 +701,31 @@ static inline doublecomplex FresnelTP(const doublecomplex ki,const doublecomplex
 //======================================================================================================================
 
 static inline void vEulerRotation(const double a,const double b,const double g,const double v0[static 3],double v1[static 3])
-// rotate vector on Euler angles a, b, g; v1=R.v0
+// rotate vector on Euler angles a, b, g; v1=R.v0 !!! vec and res must not alias
 {
-	v1[0]=cos(g)*v0[0]+(-cos(b)*v0[1]+sin(b)*v0[2])*sin(g);
-	v1[1]=cos(b)*cos(g)*v0[1]-cos(g)*sin(b)*v0[2]+sin(g)*v0[0];
-	v1[2]=cos(b)*v0[2]+sin(b)*v0[1];
+	v1[0]=cos(g)*(cos(a)*v0[0]-sin(a)*v0[1]) -
+		  cos(b)*(cos(a)*v0[1]+sin(a)*v0[0])*sin(g) +
+		  v0[2]*sin(b)*sin(g);
+	v1[1]=v0[0]*cos(b)*cos(g)*sin(a) -
+		  v0[2]*cos(g)*sin(b)-v0[1]*sin(a)*sin(g) +
+		  cos(a)*(cos(b)*cos(g)*v0[1]+sin(g)*v0[0]);
+	v1[2]=cos(b)*v0[2]+(cos(a)*v0[1]+sin(a)*v0[0])*sin(b);
+
+}
+
+//======================================================================================================================
+
+static inline void cEulerRotation(const double a,const double b,const double g,const doublecomplex v0[static 3],doublecomplex v1[static 3])
+// rotate vector on Euler angles a, b, g; v1=R.v0 !!! vec and res must not alias
+{
+	v1[0]=cos(g)*(cos(a)*v0[0]-sin(a)*v0[1]) -
+		  cos(b)*(cos(a)*v0[1]+sin(a)*v0[0])*sin(g) +
+		  v0[2]*sin(b)*sin(g);
+	v1[1]=v0[0]*cos(b)*cos(g)*sin(a) -
+		  v0[2]*cos(g)*sin(b)-v0[1]*sin(a)*sin(g) +
+		  cos(a)*(cos(b)*cos(g)*v0[1]+sin(g)*v0[0]);
+	v1[2]=cos(b)*v0[2]+(cos(a)*v0[1]+sin(a)*v0[0])*sin(b);
+
 }
 
 #ifdef USE_SSE3
