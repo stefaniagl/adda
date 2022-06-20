@@ -698,36 +698,6 @@ static inline doublecomplex FresnelTP(const doublecomplex ki,const doublecomplex
 	return 2*mr*ki/(mr*mr*ki+kt);
 }
 
-//======================================================================================================================
-
-static inline void vEulerRotation(const double a,const double b,const double g,const double v0[static 3],double v1[static 3])
-// rotate vector on Euler angles a, b, g; v1=R.v0 !!! vec and res must not alias
-{
-	v1[0]=cos(g)*(cos(a)*v0[0]-sin(a)*v0[1]) -
-		  cos(b)*(cos(a)*v0[1]+sin(a)*v0[0])*sin(g) +
-		  v0[2]*sin(b)*sin(g);
-	v1[1]=v0[0]*cos(b)*cos(g)*sin(a) -
-		  v0[2]*cos(g)*sin(b)-v0[1]*sin(a)*sin(g) +
-		  cos(a)*(cos(b)*cos(g)*v0[1]+sin(g)*v0[0]);
-	v1[2]=cos(b)*v0[2]+(cos(a)*v0[1]+sin(a)*v0[0])*sin(b);
-
-}
-
-//======================================================================================================================
-
-static inline void cEulerRotation(const double a,const double b,const double g,const doublecomplex v0[static 3],doublecomplex v1[static 3])
-// rotate vector on Euler angles a, b, g; v1=R.v0 !!! vec and res must not alias
-{
-	v1[0]=cos(g)*(cos(a)*v0[0]-sin(a)*v0[1]) -
-		  cos(b)*(cos(a)*v0[1]+sin(a)*v0[0])*sin(g) +
-		  v0[2]*sin(b)*sin(g);
-	v1[1]=v0[0]*cos(b)*cos(g)*sin(a) -
-		  v0[2]*cos(g)*sin(b)-v0[1]*sin(a)*sin(g) +
-		  cos(a)*(cos(b)*cos(g)*v0[1]+sin(g)*v0[0]);
-	v1[2]=cos(b)*v0[2]+(cos(a)*v0[1]+sin(a)*v0[0])*sin(b);
-
-}
-
 #ifdef USE_SSE3
 
 //======================================================================================================================

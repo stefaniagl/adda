@@ -235,8 +235,13 @@ static const struct subopt_struct beam_opt[]={
 		"obligatory and x, y, z coordinates of the center of the beam (in laboratory reference frame) are optional "
 		"(zero, by default). All arguments are in um. This is recommended option for simulation of the Gaussian beam. "
 		"Specification of coordinates here is DEPRECATED, use -beam_center instead.",UNDEF,B_BARTON5},
-		{"besselASD","<order> <angle>","Angular spectrum decomposition of Bessel beam. Order is integer (of any "
-			"sign) and the half-cone angle (in degrees) is measured from the z-axis.",2,B_BES_ASD},
+	{"besselASD","<order> <angle> <N>","Angular spectrum decomposition of Bessel beam. Order is integer (of any "
+		"sign) and the half-cone angle (in degrees) is measured from the z-axis.",2,B_BES_ASD},
+	{"besselASDM","<order> <angle> <ReMex> <ReMey> <ReMmx> <ReMmy> [<ImMex> <ImMey> <ImMmx> <ImMmy>]",
+		"Angular spectrum decomposition of Bessel beam (generalized). Order is integer (of any sign) and "
+		"the half-cone angle (in degrees) is measured from the z-axis. The beam is defined by 2x2 matrix M: "
+		"(Mex, Mey, Mmx, Mmy). Real parts of these four elements are obligatory, while imaginary parts are "
+		"optional (zero, by default).",UNDEF,B_BES_ASDM},
 #ifndef NO_FORTRAN
 	{"besselCS","<order> <angle>","Bessel beam with circularly symmetric energy density. Order is integer (of any "
 		"sign) and the half-cone angle (in degrees) is measured from the z-axis.",2,B_BES_CS},
@@ -1058,6 +1063,10 @@ PARSE_FUNC(beam)
 				if (Narg!=0 && Narg!=3) NargError(Narg,"0 or 3");
 				if (Narg==3) deprecated_bc_used=true;
 				break;
+			case B_BES_ASD:
+				if (Narg!=3) NargError(Narg,"3");
+				break;
+			case B_BES_ASDM: if (Narg!=6 && Narg!=10) NargError(Narg,"6 or 10"); break;
 #ifndef NO_FORTRAN
 			case B_BES_M: if (Narg!=6 && Narg!=10) NargError(Narg,"6 or 10"); break;
 #endif

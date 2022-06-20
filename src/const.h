@@ -283,6 +283,7 @@ enum incpol {
 enum beam { // beam types
 	B_BARTON5, // 5th order description of the Gaussian beam
 	B_BES_ASD, // Bessel beam (Angular spectrum decomposition)
+	B_BES_ASDM,// Bessel beam (Angular spectrum decomposition - generalized)
 #ifndef NO_FORTRAN
 	B_BES_CS,  // Bessel beam with circularly symmetric energy density
 	B_BES_CSp, // Alternative Bessel beam with circularly symmetric energy density
