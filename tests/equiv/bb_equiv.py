@@ -37,15 +37,18 @@ def adda_run(mode,option):
     dname = dirname + str(mode)
     #os.makedirs(dname, exist_ok=True)
     cmdline = adda_exec + ' -dir ' + dname + option + ' > ' + os.devnull
+    #cmdline = adda_exec + ' -dir ' + dname + option
     os.system(cmdline)
 
 
 # print difference
 def printdiff(val,x,y):
-    cdiff = math.fabs((x-y)/y) # calculated relative difference
-    if (cdiff > fdiff):
+    if ((x != 0) or (y != 0)):
+        cdiff = math.fabs((x-y)/x) # calculated relative difference
         fr.write('\n\t\t'+val + ':\n\t\tcase 1:\t'+str(x)+'\n\t\tcase 2:\t'+str(y)+'\n\t\tdiff:\t'+str(cdiff)+'\n')
-        return 1
+        if (cdiff > fdiff):
+            #fr.write('\n\t\t'+val + ':\n\t\tcase 1:\t'+str(x)+'\n\t\tcase 2:\t'+str(y)+'\n\t\tdiff:\t'+str(cdiff)+'\n')
+            return 1
     return 0
 
 

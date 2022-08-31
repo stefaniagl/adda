@@ -1,5 +1,5 @@
 # Main makefile for ADDA
-# Requires GNU make (at least 3.81) to execute. 
+# Requires GNU make (at least 3.81) to execute.
 # Actual compiling goes in folders 'seq', 'mpi', and 'ocl' for sequential, parallel (MPI), and OpenCL (GPU accelerated)
 # version respectively
 #
@@ -18,7 +18,7 @@
 #=======================================================================================================================
 # !!! This makefile accepts environmental variables CFLAGS, FFLAGS, CPPFLAGS, LDFLAGS, and LDLIBS. First three are
 # passed to C, Fortran, and C++ compiler respectively, and last two are passed to the linker. Values specified below are
-# added to the values given by the environment. This can be used in invocation of make as: 
+# added to the values given by the environment. This can be used in invocation of make as:
 # > export CFLAGS=...; make ...
 # These variables can also be given in the command line to make, but it will override all values specified in this
 # Makefile. This is especially critical for CFLAGS which should be overridden only with much care, including all
@@ -87,7 +87,7 @@ VALID_OPTS := DEBUG DEBUGFULL FFT_TEMPERTON PRECISE_TIMING NOT_USE_LOCK ONLY_LOC
               OVERRIDE_STDC_TEST OCL_READ_SOURCE_RUNTIME CLFFT_APPLE SPARSE USE_SSE3 OCL_BLAS NO_GITHASH HOMEBREW \
 
 # Debug mode. By default, release configuration is used (no debug, no warnings, maximum optimization). DEBUG turns on
-# producing debugging symbols (-g) and warnings and brings optimization down to O1. DEBUGFULL turns off optimization 
+# producing debugging symbols (-g) and warnings and brings optimization down to O1. DEBUGFULL turns off optimization
 # completely and turns on additional diagnostic messages in the source code (debug.c/h).
 #override OPTIONS += DEBUG
 #override OPTIONS += DEBUGFULL
@@ -147,7 +147,7 @@ VALID_OPTS := DEBUG DEBUGFULL FFT_TEMPERTON PRECISE_TIMING NOT_USE_LOCK ONLY_LOC
 # command 'make CC=gcc-4.7' (analogously for Fortran and C++ compilers).
 # gnu - tested for multiple versions starting from 3.2.3, but recently only 4.8 and higher
 # intel (Intel C++ and Fortran Compilers Classic) - tested for versions starting from 9.0, but recently only on 2021.1
-# intelX (Intel oneAPI C++ Compiler, based on LLVM, and new Fortran compiler) - tested on version 2021.1 
+# intelX (Intel oneAPI C++ Compiler, based on LLVM, and new Fortran compiler) - tested on version 2021.1
 # compaq - tested on Compaq C V6.5-303 (dtk) - last tested in 2007
 # ibm - tested on xlc 8.0 - last tested in 2008
 # hpux - tested on ia64
@@ -178,8 +178,8 @@ override EXTRA_FLAGS +=
 
 # --Fortran library path--
 # If your environment does not specify search path for Fortran libraries, you may get errors during linking of ADDA.
-# For instance, this may happen on macOS. Then uncomment the following line and modify the path if needed. 
-# This variable can also be defined in the enviroment or in the command line of make (see explanation above for OPTIONS) 
+# For instance, this may happen on macOS. Then uncomment the following line and modify the path if needed.
+# This variable can also be defined in the enviroment or in the command line of make (see explanation above for OPTIONS)
 #FORT_LIB_PATH := /usr/local/gfortran/lib
 
 #=======================================================================================================================
@@ -196,7 +196,8 @@ CSOURCE := ADDAmain.c CalculateE.c calculator.c chebyshev.c cmplx.c comm.c cross
 # Fortran files are located in src/fort folder, other files may be added below
 FSOURCE := d07hre.f d09hre.f d113re.f d132re.f dadhre.f dchhre.f dcuhre.f dfshre.f dinhre.f drlhre.f dtrhre.f \
            propaesplibreintadda.f
-F90SOURCE := bessel.f90
+#F90SOURCE := bessel.f90
+F90SOURCE := special_functions_trim.f90
 # C++ files are located in src/cpp folder, other files may be added below
 CPPSOURCE :=
 
@@ -250,7 +251,7 @@ ifneq ($(filter SPARSE,$(OPTIONS)),)
   ifneq ($(filter PRECISE_TIMING,$(OPTIONS)),)
     $(error SPARSE is currently incompatible with PRECISE_TIMING)
   endif
-  
+
   CDEFS += -DSPARSE
 else
   CSOURCE += fft.c
@@ -363,7 +364,7 @@ ifeq ($(COMPILER),gnu)
   # produces version string in format like 80203
   GCC_VERSION := $(shell gcc -dumpfullversion -dumpversion | sed -e 's/\.\([0-9][0-9]\)/\1/g' -e 's/\.\([0-9]\)/0\1/g' \
     -e 's/^[0-9]\{3,4\}$$/&00/')
-   
+
   CC      := gcc
   CSTD    := -std=c99
   # in version 4.8 gcc introduced convenient flag for optimizations that do not interfere with debugging
@@ -383,12 +384,12 @@ ifeq ($(COMPILER),gnu)
   ifeq "$(shell expr $(GCC_VERSION) \>= 40702)" "1"
     CWARN += -pedantic
   endif
-  
+
   # On Windows (with MinGW) there is certain motivation to link Fortran libraries statically, since otherwise three
   # DLLs (total size about 1.5MB) need to be distributed together with executables. Static linking increases the size
   # of ADDA by about 0.4MB, but we distribute at least 5 executables (not counting misc/). Moreover, complete static
   # linking is inconvenient since FFTW3 static libraries are not easily available for Windows (need to be recompiled
-  # manually). Selective static linking can be achived by surrounding '-l...' flags in '-Wl,-Bstatic' ... 
+  # manually). Selective static linking can be achived by surrounding '-l...' flags in '-Wl,-Bstatic' ...
   # '-Wl,-Bdynamic', but we do not do it here.
   #
   # Use gfortran if available (GCC 4 and later), otherwise try g77
@@ -413,7 +414,7 @@ else ifeq ($(COMPILER),intel)
   COPT1 := -O1
   COPT2 := -Ofast
   # remove 2259 to diagnose silent conversion between doublecomplex and double, but it will cause false positives
-  CWARN := -Wcheck -w3 -diag-disable 1418,1419,1572,2259,2282,11074,11076 
+  CWARN := -Wcheck -w3 -diag-disable 1418,1419,1572,2259,2282,11074,11076
   CF    := ifort
   #FLIBS := -lifcore
   CCPP  := icpc
@@ -536,15 +537,15 @@ cleanmpi:
 cleanocl:
 	@echo "Removing OpenCL compiled files"
 	cd $(OCL) && rm -f *.o *.d $(OPTSFILES) $(PROGOCL) $(PROGOCL).exe *.clstr
-	
-cleanrunsseq: 
+
+cleanrunsseq:
 	@echo "Removing output of sequential version of ADDA"
 	cd $(SEQ) && rm -f -r ExpCount run???_* test???_*
 
-cleanrunsmpi: 
+cleanrunsmpi:
 	@echo "Removing output of MPI version of ADDA"
 	cd $(MPI) && rm -f -r ExpCount run???_* test???_*
-	
-cleanrunsocl: 
+
+cleanrunsocl:
 	@echo "Removing output of OpenCL version of ADDA"
 	cd $(OCL) && rm -f -r ExpCount run???_* test???_*

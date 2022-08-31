@@ -456,6 +456,17 @@ static inline void vMultScal(const double a,const double b[static 3],double c[st
 
 //======================================================================================================================
 
+static inline void cMult4(const doublecomplex a,const doublecomplex b[static 4],doublecomplex c[static 4])
+// multiplication of real vector by scalar; c=a*b;
+{
+	c[0]=a*b[0];
+	c[1]=a*b[1];
+	c[2]=a*b[2];
+	c[3]=a*b[3];
+}
+
+//======================================================================================================================
+
 static inline void vMult(const double a[static 3],const double b[static 3],double c[static 3])
 // multiplication of two vectors (by elements); c[i]=a[i]*b[i];
 {
