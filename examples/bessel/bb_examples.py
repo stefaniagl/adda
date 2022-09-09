@@ -14,8 +14,8 @@ adda_exec = os.path.abspath(__file__ + "/../../../src/seq/adda")
 
 
 # define here different parameters for 2 options (see ADDA manual)
-run_options = [' -beam besselLE  2 15',  # option 1
-               ' -beam besselLM  2 15']  # option 2
+run_options = [' -beam besselTEL  2 65',  # option 1
+               ' -beam besselTML  2 65']  # option 2
 
 # =============================================================================
 # Bessel beams in ADDA:
@@ -52,7 +52,6 @@ def adda_run(mode): # option 1 or 2
     # common parameters for 2 options
     cmdline = adda_exec
     cmdline += ' -grid 16' # particle discretization
-    cmdline += ' -sym enf' # do not simulate second polarization
     cmdline += ' -ntheta 180' # number of scattering angles
     cmdline += ' -store_beam' # save incident field
     cmdline += ' -dir option_' + str(mode) # save path
@@ -157,7 +156,7 @@ theta_2,iper_2,ipar_2,xd_2,yd_2,ed_2,z0_2 = extractData(2) # extraction of ADDA 
 
 # data visualisation
 
-fig = plt.figure()
+fig = plt.figure(figsize=(9,6))
 # Visualisation of the amplitude of the incident electric field for option 1
 ax = fig.add_subplot(221,projection='3d')
 plotField(xd_1,yd_1,ed_1,z0_1,1)

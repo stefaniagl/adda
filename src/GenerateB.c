@@ -66,7 +66,7 @@ static int besN;                  // Bessel beam order
 static double besAlpha;           // half-cone angle (in radians)
 static doublecomplex besKt,besKz; // wave-vector components (transverse and longitudinal)
 static doublecomplex besM[4];     // Matrix M defining the generalized Bessel beam
-static doublecomplex besF[3][5];  // Matrix of coefficients for the generalized Bessel beam
+static doublecomplex besF[8];  // Matrix of coefficients for the generalized Bessel beam
 
 #endif
 /* TO ADD NEW BEAM
@@ -202,7 +202,9 @@ void InitBeam(void)
 			TestRangeII(besN,"beam order (might cause the incorrect calculation of Bessel function)",-50,50);
 			vorticity=besN;
 			besAlpha=Deg2Rad(beam_pars[1]);
-			TestRangeII(beam_pars[1],"half-cone angle",0,90);
+			if ((beamtype!=B_BES_TEL) && (beamtype!=B_BES_TML))
+				 TestRangeII(beam_pars[1],"half-cone angle",0,90);
+			else TestRangeNN(beam_pars[1],"half-cone angle",0,90);
 			besKt=WaveNum*sin(besAlpha);
 			besKz=WaveNum*cos(besAlpha);
 			switch (beamtype) { // definition of elements of matrix M ((Mex,Mey),(Mmx,Mmy))
@@ -242,42 +244,54 @@ void InitBeam(void)
 					if (IFROOT) tmp_str="linear magnetic field";
 					break;
 				case B_BES_TEL:
-					// here we define besM=besKt*M to avoid calculation of false singularities
-					besM[0]=-WaveNum;  besM[1]=0;
-					besM[2]=0;         besM[3]=besKz;
+					if (besAlpha < 2*ROUND_ERR) {
+						besM[0]=0;  besM[1]=0;	besM[2]=0;  besM[3]=0;
+					}
+					else {
+						besM[0]=-WaveNum/besKt;  besM[1]=0;
+						besM[2]=0;         		 besM[3]=besKz/besKt;
+					}
 					if (IFROOT) tmp_str="linear component of the TE";
 					break;
 				case B_BES_TML:
-					// here we define besM=besKt*M to avoid calculation of false singularities
-					besM[0]=0;        besM[1]=besKz;
-					besM[2]=WaveNum;  besM[3]=0;
+					if (besAlpha < 2*ROUND_ERR) {
+						besM[0]=0;  besM[1]=0;	besM[2]=0;  besM[3]=0;
+					}
+					else {
+						besM[0]=0;        		besM[1]=besKz/besKt;
+						besM[2]=WaveNum/besKt;  besM[3]=0;
+					}
 					if (IFROOT) tmp_str="linear component of the TM";
 					break;
 				default: LogError(ONE_POS,"Incompatibility error in GenerateB");
 			}
-			// here we define besM=besKt*M for other types
-			if ((beamtype!=B_BES_TEL) && (beamtype!=B_BES_TML)) cMult4(besKt,besM,besM);
-			// Ex coefficients
-			besF[0][0] = besKt/4.*(besM[0]+I*besM[1]);
-			besF[0][1] = 0;
-			besF[0][2] = ((WaveNum*WaveNum+besKz*besKz)/2.*besM[0] + WaveNum*besKz*besM[3])/besKt;
-			besF[0][3] = 0;
-			besF[0][4] = besKt/4.*(besM[0]-I*besM[1]);
-			// Ey coefficients
-			besF[1][0] = I*besKt/4.*(besM[0]+I*besM[1]);
-			besF[1][1] = 0;
-			besF[1][2] = ((WaveNum*WaveNum+besKz*besKz)/2.*besM[1] - WaveNum*besKz*besM[2])/besKt;
-			besF[1][3] = 0;
-			besF[1][4] = -I*besKt/4.*(besM[0]-I*besM[1]);
-			// Ez coefficients
-			besF[2][0] = 0;
-			besF[2][1] =  0.5*(I*besKz*(besM[0]+I*besM[1]) + WaveNum*(besM[2]+I*besM[3]));
-			besF[2][2] = 0;
-			besF[2][3] = -0.5*(I*besKz*(besM[0]-I*besM[1]) - WaveNum*(besM[2]-I*besM[3]));
-			besF[2][4] = 0;
-
-			// TODO: some symmetries can be retained in some special cases
-			symR=symX=symY=symZ=false;
+			if ((besAlpha < 0.0001) && ((beamtype==B_BES_TEL) || (beamtype==B_BES_TML))) {
+				// Here expressions rewritten for small besKt for TEL and TML beams
+				// Ex coefficients
+				besF[0] = besKt/4.*(besM[0]+I*besM[1]);
+				besF[1] = 0.5*WaveNum*besM[0]*besAlpha*(1-0.25*besAlpha*besAlpha)/(1-besAlpha*besAlpha/6.);			// !!!
+				besF[2] = besKt/4.*(besM[0]-I*besM[1]);
+				// Ey coefficients
+				besF[3] = I*besKt/4.*(besM[0]+I*besM[1]);
+				besF[4] = -0.5*WaveNum*besM[2]*besAlpha*(1-5./6.*besAlpha*besAlpha)/(1-besAlpha*besAlpha/6.);;				// !!!
+				besF[5] = -I*besKt/4.*(besM[0]-I*besM[1]);
+				// Ez coefficients
+				besF[6] =  0.5*(I*besKz*(besM[0]+I*besM[1]) + WaveNum*(besM[2]+I*besM[3]));
+				besF[7] = -0.5*(I*besKz*(besM[0]-I*besM[1]) - WaveNum*(besM[2]-I*besM[3]));
+			}
+			else {
+				// Ex coefficients
+				besF[0] = besKt*besKt/4.*(besM[0]+I*besM[1]);
+				besF[1] = (WaveNum*WaveNum+besKz*besKz)/2.*besM[0] + WaveNum*besKz*besM[3];
+				besF[2] = besKt*besKt/4.*(besM[0]-I*besM[1]);
+				// Ey coefficients
+				besF[3] = I*besKt*besKt/4.*(besM[0]+I*besM[1]);
+				besF[4] = (WaveNum*WaveNum+besKz*besKz)/2.*besM[1] - WaveNum*besKz*besM[2];
+				besF[5] = -I*besKt*besKt/4.*(besM[0]-I*besM[1]);
+				// Ez coefficients
+				besF[6] =  0.5*besKt*(I*besKz*(besM[0]+I*besM[1]) + WaveNum*(besM[2]+I*besM[3]));
+				besF[7] = -0.5*besKt*(I*besKz*(besM[0]-I*besM[1]) - WaveNum*(besM[2]-I*besM[3]));
+			}
 			// beam info
 			if (IFROOT) beam_descr=dyn_sprintf("Bessel beam (%s)\n"
 				                               "\tOrder: %d, half-cone angle: "GFORMDEF" deg",
@@ -585,9 +599,9 @@ void GenerateB (const enum incpol which,   // x - or y polarized incident light
 					fn[m] = pow(-1,(nm)*(1-sgn)/2.)*jn[abs(nm)]*cpow(t4,m-2);
 				}
 
-				t1 = besF[0][0]*fn[0] + besF[0][2]*fn[2] + besF[0][4]*fn[4];	// Ex
-				t2 = besF[1][0]*fn[0] + besF[1][2]*fn[2] + besF[1][4]*fn[4];	// Ey
-				t3 = besF[2][1]*fn[1] + besF[2][3]*fn[3];	// Ez
+				t1 = besF[0]*fn[0] + besF[1]*fn[2] + besF[2]*fn[4];	// Ex
+				t2 = besF[3]*fn[0] + besF[4]*fn[2] + besF[5]*fn[4];	// Ey
+				t3 = besF[6]*fn[1] + besF[7]*fn[3];	// Ez
 
 				cvMultScal_RVec(t1,ex,v1);
 				cvMultScal_RVec(t2,ey,v2);
