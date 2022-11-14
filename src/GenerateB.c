@@ -244,20 +244,14 @@ void InitBeam(void)
 					if (IFROOT) tmp_str="linear magnetic field";
 					break;
 				case B_BES_TEL:
-					if (besAlpha < ROUND_ERR) {
-						besM[0]=0;  besM[1]=0;	besM[2]=0;  besM[3]=0;
-					}
-					else {
+					if (besAlpha > ROUND_ERR) {
 						besM[0]=-WaveNum/besKt;  besM[1]=0;
 						besM[2]=0;         		 besM[3]=besKz/besKt;
 					}
 					if (IFROOT) tmp_str="linear component of the TE";
 					break;
 				case B_BES_TML:
-					if (besAlpha < ROUND_ERR) {
-						besM[0]=0;  besM[1]=0;	besM[2]=0;  besM[3]=0;
-					}
-					else {
+					if (besAlpha > ROUND_ERR) {
 						besM[0]=0;        		besM[1]=besKz/besKt;
 						besM[2]=WaveNum/besKt;  besM[3]=0;
 					}
@@ -285,10 +279,13 @@ void InitBeam(void)
 						(1-q)*((WaveNum*WaveNum+besKz*besKz)/2.*besM[1] - WaveNum*besKz*besM[2]);
 			besF[5] = -I*besKt*besKt/4.*(besM[0]-I*besM[1]);
 			// Ez coefficients
-			besF[6] =  0.5*besKt*(I*besKz*(besM[0]+I*besM[1]) + WaveNum*(besM[2]+I*besM[3]));
-			besF[7] = -0.5*besKt*(I*besKz*(besM[0]-I*besM[1]) - WaveNum*(besM[2]-I*besM[3]));
+			besF[6] =  q*0.5*besKt/besKz/WaveNum*( besKt*besKt*Ay - (besKt*besKt+WaveNum*WaveNum)*By + 2*I*besKz*WaveNum*Bx) +
+						(1-q)*0.5*besKt*(I*besKz*(besM[0]+I*besM[1]) + WaveNum*(besM[2]+I*besM[3]));
+			besF[7] =  q*0.5*besKt/besKz/WaveNum*(-besKt*besKt*Ay + (besKt*besKt+WaveNum*WaveNum)*By + 2*I*besKz*WaveNum*Bx) +
+						(q-1)*0.5*besKt*(I*besKz*(besM[0]-I*besM[1]) - WaveNum*(besM[2]-I*besM[3]));
 
 			for (i=0;i<8;i++) { besF[i] *= 1./(WaveNum*WaveNum); }
+
 			// beam info
 			if (IFROOT) beam_descr=dyn_sprintf("Bessel beam (%s)\n"
 				                               "\tOrder: %d, half-cone angle: "GFORMDEF" deg",
