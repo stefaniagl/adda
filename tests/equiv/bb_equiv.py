@@ -13,9 +13,8 @@ fdiff = 1e-9 # fixed relative difference
 # path to adda executable
 #adda_exec = "../../win64/adda.exe"
 adda_exec = os.path.abspath(__file__ + "/../../../src/seq/adda")
-dirname = 'out'    
+dirname = 'out'
 
-                                                                    
 
 def extractCrosSeq(mode,pol):
     dname = dirname + str(mode)
@@ -28,12 +27,12 @@ def extractCrosSeq(mode,pol):
     Qext = float(dat[5])
     Cabs = float(dat[8])
     Qabs = float(dat[11])
-    
+
     return Cext,Qext,Cabs,Qabs
 
 
 # data generation (run of ADDA code)
-def adda_run(mode,option):                                                            
+def adda_run(mode,option):
     dname = dirname + str(mode)
     #os.makedirs(dname, exist_ok=True)
     cmdline = adda_exec + ' -sym no -eps 9 -dir ' + dname + option + ' > ' + os.devnull
@@ -64,10 +63,10 @@ def printsearch(pol):
 
 
 def compare(line1,line2):
-    
+
     adda_run(1,line1)
     adda_run(2,line2)
-    
+
     print('\nCompare:\n'+line1+'\n'+line2)
     fr.write('\n\nCompare:\n'+line1+'\n'+line2)
     dtotal = 0
@@ -78,11 +77,9 @@ def compare(line1,line2):
     else:
         print('\033[31m', '\nNot passed (see bb_results.txt)', '\033[0m', sep='') #red
     fr.write('\n\nDone\n___')
-    
     shutil.rmtree('out1')
     shutil.rmtree('out2')
 
-    
 fname = "bb_results.txt"
 fr = open(fname, "w")
 fr.write("The comparison of equivalent cases (command lines) \nfor the scattering of Bessel beams calculated in ADDA.")
@@ -173,6 +170,80 @@ compare(opt1,opt2)
 
 opt1 = ' -beam besselM 2 '+str(al2)+' 0 '+str(1/math.tan(al2*math.pi/180))+' '+str(1/math.sin(al2*math.pi/180))+' 0'
 opt2 = ' -beam besselTML 2 '+str(al2)
+compare(opt1,opt2)
+
+
+# Bessel beams near a substrate
+
+casename = "\n\nASD and CS Bessel beam"
+print(casename)
+fr.write(casename)
+opt1 = ' -beam besselASD 2 15'
+opt2 = ' -beam besselASD 2 15'
+compare(opt1,opt2)
+
+casename = "\n\nASD Bessel beam and a plane wave (from substrate)"
+print(casename)
+fr.write(casename)
+comm = ' -prop 0 0 1 -size 2 -surf 1 2 0 '
+opt1 = comm + ''
+opt2 = comm + ' -beam besselASD 0 0'
+compare(opt1,opt2)
+
+casename = "\n\nASD Bessel beam and a plane wave (above substrate)"
+print(casename)
+fr.write(casename)
+comm = ' -prop 0 0 -1 -size 2 -surf 1 2 0 '
+opt1 = comm + ''
+opt2 = comm + ' -beam besselASD 0 0'
+compare(opt1,opt2)
+
+casename = "\n\nASD Bessel beam from the optically soft substrate (m~1.) and CS Bessel beam"
+print(casename)
+fr.write(casename)
+comm = ' -prop 0 0 1 -size 2 '
+opt1 = comm + ' -beam besselASD 2 15'
+opt2 = comm + ' -beam besselASD 2 15 -surf 1 1.000000001 0 '
+compare(opt1,opt2)
+
+casename = "\n\nASD Bessel beam above the optically soft substrate (m~1.) and CS Bessel beam"
+print(casename)
+fr.write(casename)
+comm = ' -prop 0 0 -1 -size 2 '
+opt1 = comm + ' -beam besselASD 2 15'
+opt2 = comm + ' -beam besselASD 2 15 -surf 1 1.000000001 0 '
+compare(opt1,opt2)
+
+casename = "\n\nASD Bessel beam and a plane wave (from substrate) - oblique incidence"
+print(casename)
+fr.write(casename)
+comm = ' -prop 1 2 3 -size 2 -surf 1 2 0 '
+opt1 = comm + ''
+opt2 = comm + ' -beam besselASD 0 0'
+compare(opt1,opt2)
+
+casename = "\n\nASD Bessel beam and a plane wave (above substrate) - oblique incidence"
+print(casename)
+fr.write(casename)
+comm = ' -prop 1 2 -3 -size 2 -surf 1 2 0 '
+opt1 = comm + ''
+opt2 = comm + ' -beam besselASD 0 0'
+compare(opt1,opt2)
+
+casename = "\n\nASD Bessel beam from the optically soft substrate (m~1.) and CS Bessel beam - oblique incidence"
+print(casename)
+fr.write(casename)
+comm = ' -prop 1 2 3 -size 2 '
+opt1 = comm + ' -beam besselASD 2 15'
+opt2 = comm + ' -beam besselASD 2 15 -surf 1 1.000000001 0 '
+compare(opt1,opt2)
+
+casename = "\n\nASD Bessel beam above the optically soft substrate (m~1.) and CS Bessel beam - oblique incidence"
+print(casename)
+fr.write(casename)
+comm = ' -prop 1 2 -3 -size 2 '
+opt1 = comm + ' -beam besselASD 2 15'
+opt2 = comm + ' -beam besselASD 2 15 -surf 1 1.000000001 0 '
 compare(opt1,opt2)
 
 fr.close()
