@@ -521,14 +521,13 @@ void GenerateB (const enum incpol which,   // x - or y polarized incident light
 	doublecomplex eIncTran[3],eIncRefl[3];
 	// for Bessel ASD
 	int N,t;
+	doublecomplex vort;  // vortex phase of Bessel beam rotated by 90 deg
 	doublecomplex sum[3],fint[3],cblank[3];
 	double phi,r,tht,phip,thtp,db,beta,blank[3],es[3],ep[3],prop_b[3];
 	doublecomplex eIncRefls[3],eIncReflp[3],eIncTrans[3],eIncTranp[3];
 #ifndef NO_FORTRAN
 	// for Bessel beams
 	int nm,m,sgn;
-	double phi;
-	doublecomplex vort;  // vortex phase of Bessel beam rotated by 90 deg
 	doublecomplex fn[5]; // for general functions f(n,ro,phi) of Bessel beams (fn-2, fn-1, fn, fn+1, fn+2, respectively)
 	doublecomplex arg,blankN[abs(besN)+3],jn[abs(besN)+3]; // for Bessel beams
 #endif

@@ -7,7 +7,7 @@ import os,shutil,re,math
 
 
 
-fdiff = 1e-9 # fixed relative difference
+fdiff = 1e-8 # fixed relative difference
 
 
 # path to adda executable
@@ -88,7 +88,7 @@ fr.close()
 
 fr = open(fname, "a")
 
-
+'''
 print('\n\nPlane-wave limit of LE Bessel beam')
 fr.write('\n\nPlane-wave limit of LE Bessel beam')
 opt1 = ''
@@ -171,15 +171,16 @@ compare(opt1,opt2)
 opt1 = ' -beam besselM 2 '+str(al2)+' 0 '+str(1/math.tan(al2*math.pi/180))+' '+str(1/math.sin(al2*math.pi/180))+' 0'
 opt2 = ' -beam besselTML 2 '+str(al2)
 compare(opt1,opt2)
-
+'''
 
 # Bessel beams near a substrate
+n = 15
 
 casename = "\n\nASD and CS Bessel beam"
 print(casename)
 fr.write(casename)
-opt1 = ' -beam besselASD 2 15'
-opt2 = ' -beam besselASD 2 15'
+opt1 = ' -beam besselCS  2 15 '
+opt2 = ' -beam besselASD 2 15 '+str(n)
 compare(opt1,opt2)
 
 casename = "\n\nASD Bessel beam and a plane wave (from substrate)"
@@ -187,7 +188,7 @@ print(casename)
 fr.write(casename)
 comm = ' -prop 0 0 1 -size 2 -surf 1 2 0 '
 opt1 = comm + ''
-opt2 = comm + ' -beam besselASD 0 0'
+opt2 = comm + ' -beam besselASD 0 0 '+str(n)
 compare(opt1,opt2)
 
 casename = "\n\nASD Bessel beam and a plane wave (above substrate)"
@@ -195,23 +196,23 @@ print(casename)
 fr.write(casename)
 comm = ' -prop 0 0 -1 -size 2 -surf 1 2 0 '
 opt1 = comm + ''
-opt2 = comm + ' -beam besselASD 0 0'
+opt2 = comm + ' -beam besselASD 0 0 '+str(n)
 compare(opt1,opt2)
 
 casename = "\n\nASD Bessel beam from the optically soft substrate (m~1.) and CS Bessel beam"
 print(casename)
 fr.write(casename)
 comm = ' -prop 0 0 1 -size 2 '
-opt1 = comm + ' -beam besselASD 2 15'
-opt2 = comm + ' -beam besselASD 2 15 -surf 1 1.000000001 0 '
+opt1 = comm + ' -beam besselCS  2 15 '
+opt2 = comm + ' -beam besselASD 2 15 '+str(n)+' -surf 1 1.000000001 0 '
 compare(opt1,opt2)
 
 casename = "\n\nASD Bessel beam above the optically soft substrate (m~1.) and CS Bessel beam"
 print(casename)
 fr.write(casename)
 comm = ' -prop 0 0 -1 -size 2 '
-opt1 = comm + ' -beam besselASD 2 15'
-opt2 = comm + ' -beam besselASD 2 15 -surf 1 1.000000001 0 '
+opt1 = comm + ' -beam besselASD 2 15 '+str(n)
+opt2 = comm + ' -beam besselASD 2 15 '+str(n)+' -surf 1 1.000000001 0 '
 compare(opt1,opt2)
 
 casename = "\n\nASD Bessel beam and a plane wave (from substrate) - oblique incidence"
@@ -219,7 +220,7 @@ print(casename)
 fr.write(casename)
 comm = ' -prop 1 2 3 -size 2 -surf 1 2 0 '
 opt1 = comm + ''
-opt2 = comm + ' -beam besselASD 0 0'
+opt2 = comm + ' -beam besselASD 0 0 '+str(n)
 compare(opt1,opt2)
 
 casename = "\n\nASD Bessel beam and a plane wave (above substrate) - oblique incidence"
@@ -227,23 +228,23 @@ print(casename)
 fr.write(casename)
 comm = ' -prop 1 2 -3 -size 2 -surf 1 2 0 '
 opt1 = comm + ''
-opt2 = comm + ' -beam besselASD 0 0'
+opt2 = comm + ' -beam besselASD 0 0 '+str(n)
 compare(opt1,opt2)
 
 casename = "\n\nASD Bessel beam from the optically soft substrate (m~1.) and CS Bessel beam - oblique incidence"
 print(casename)
 fr.write(casename)
 comm = ' -prop 1 2 3 -size 2 '
-opt1 = comm + ' -beam besselASD 2 15'
-opt2 = comm + ' -beam besselASD 2 15 -surf 1 1.000000001 0 '
+opt1 = comm + ' -beam besselASD 2 15 '+str(n)
+opt2 = comm + ' -beam besselASD 2 15 '+str(n)+' -surf 1 1.000000001 0 '
 compare(opt1,opt2)
 
 casename = "\n\nASD Bessel beam above the optically soft substrate (m~1.) and CS Bessel beam - oblique incidence"
 print(casename)
 fr.write(casename)
 comm = ' -prop 1 2 -3 -size 2 '
-opt1 = comm + ' -beam besselASD 2 15'
-opt2 = comm + ' -beam besselASD 2 15 -surf 1 1.000000001 0 '
+opt1 = comm + ' -beam besselASD 2 15 '+str(n)
+opt2 = comm + ' -beam besselASD 2 15 '+str(n)+' -surf 1 1.000000001 0 '
 compare(opt1,opt2)
 
 fr.close()

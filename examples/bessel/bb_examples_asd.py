@@ -26,10 +26,11 @@ adda_exec = os.path.abspath(__file__ + "/../../../src/seq/adda")
 #                comm + ' -beam besselASD 0 0 ']  # option 2
 # =============================================================================
 
-comm = ' -size 10 -prop 2 3 -1  '
+#comm = ' -size 1 -prop 2 3 -1  '
+comm = ' -prop 0 0 -1 '
 # define here different parameters for 2 options (see ADDA manual)
 run_options = [comm + ' -beam besselCS  2 15 ',  # option 1
-               comm + ' -beam besselASD 2 15 -surf 5 1.000001 0 ']  # option 2
+               comm + ' -beam besselASD 2 15 15']  # option 2
 
 # =============================================================================
 # Bessel beams in ADDA:
