@@ -295,6 +295,7 @@ enum beam { // beam types
 #endif
 	B_DAVIS3,  // 3rd order description of the Gaussian beam
 	B_DIPOLE,  // field of a point dipole
+	B_GAUSS_ASD, // ASD of Gaussian beam
 	B_LMINUS,  // 1st order description of the Gaussian beam
 	B_PLANE,   // infinite plane wave
 	B_READ     // read from file

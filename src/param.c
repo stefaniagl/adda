@@ -266,6 +266,8 @@ static const struct subopt_struct beam_opt[]={
 		"frame). All arguments are in um. Orientation of the dipole is determined by -prop command line option."
 		"Implies '-scat_matr none'. If '-surf' is used, dipole position should be above the surface. Specification of "
 		"coordinates here is DEPRECATED, use -beam_center instead.",UNDEF,B_DIPOLE},
+	{"gaussASD","<width> <N>","Angular spectrum decomposition of Gaussian beam. The beam width and number "
+		"of decomposition terms are obligatory.",2,B_GAUSS_ASD},
 	{"lminus","<width> [<x> <y> <z>]","Simplest approximation of the Gaussian beam. The beam width is obligatory and "
 		"x, y, z coordinates of the center of the beam (in laboratory reference frame) are optional (zero, by"
 		" default). All arguments are in um. Specification of coordinates here is DEPRECATED, use -beam_center "
@@ -1060,6 +1062,7 @@ PARSE_FUNC(beam)
 				if (Narg!=3) NargError(Narg,"3");
 				break;
 			case B_BES_ASDM: if (Narg!=6 && Narg!=10) NargError(Narg,"6 or 10"); break;
+			case B_GAUSS_ASD: if (Narg!=2) NargError(Narg,"2"); break;
 #ifndef NO_FORTRAN
 			case B_BES_M: if (Narg!=6 && Narg!=10) NargError(Narg,"6 or 10"); break;
 #endif

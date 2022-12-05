@@ -27,10 +27,26 @@ adda_exec = os.path.abspath(__file__ + "/../../../src/seq/adda")
 # =============================================================================
 
 #comm = ' -size 1 -prop 2 3 -1  '
-comm = ' -prop 0 0 -1 '
+comm = ' -size 1 '
 # define here different parameters for 2 options (see ADDA manual)
+'''
 run_options = [comm + ' -beam besselCS  2 15 ',  # option 1
                comm + ' -beam besselASD 2 15 15']  # option 2
+
+run_options = [comm + ' ',  # option 1
+               comm + ' -beam gaussASD 100 50']  # option 2
+
+run_options = [comm + ' -beam davis3 15 ',  # option 1
+               comm + ' -beam gaussASD 15 20 -surf 0.5 1.1 0 ']  # option 2
+'''
+comm = ' -size 1 -surf 0.5 1.1 0 -prop 1 1 1 '
+run_options = [comm + ' ',  # option 1
+               comm + ' -beam gaussASD 15 20 ']  # option 2
+
+# =============================================================================
+# run_options = [comm + ' ',  # option 1
+#                comm + ' -beam davis3 10 ']  # option 2
+# =============================================================================
 
 # =============================================================================
 # Bessel beams in ADDA:
@@ -55,7 +71,7 @@ run_options = [comm + ' -beam besselCS  2 15 ',  # option 1
 #   Order is integer (of any sign) and the half-cone angle (in degrees) 
 #   is measured from the z-axis.
 # =============================================================================
-                                                                              
+                                                                             
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -69,7 +85,7 @@ def adda_run(mode): # option 1 or 2
     
     # common parameters for 2 options
     cmdline = adda_exec
-    cmdline += ' -grid 15 -shape box ' # particle discretization
+    cmdline += ' -grid 16 -shape box ' # particle discretization
     #cmdline += ' -sym enf' # do not simulate second polarization
     cmdline += ' -ntheta 180' # number of scattering angles
     cmdline += ' -store_beam' # save incident field
@@ -161,9 +177,9 @@ def plotData(xv1,yv1,xv2,yv2,flag):
 def plotField(xd,yd,ed,z0,mode,ax):
     ax.set_title(r'OPTION '+str(mode)+':\n '+run_options[mode-1]+'\nIntensity profile of $|E_{inc}|^2$\n(z = '+str(round(z0,2))+')');
     ax.scatter(xd, yd, ed, c=ed, cmap='viridis', linewidth=0.5);
-    ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
-    ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
-    ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
     #ax.axis('off')
 
     
