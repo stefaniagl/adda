@@ -7,7 +7,7 @@ import os,shutil,re,math
 
 
 
-fdiff = 1e-7 # fixed relative difference
+fdiff = 1e-8 # fixed relative difference
 
 
 # path to adda executable
@@ -42,7 +42,7 @@ def adda_run(mode,option):
 
 # print difference
 def printdiff(val,x,y):
-    cdiff = math.fabs((x-y))/(math.fabs(y)+fdiff) # calculated relative difference
+    cdiff = math.fabs((x-y)/y) # calculated relative difference
     if (cdiff > fdiff):
         fr.write('\n\t\t'+val + ':\n\t\tcase 1:\t'+str(x)+'\n\t\tcase 2:\t'+str(y)+'\n\t\tdiff:\t'+str(cdiff)+'\n')
         return 1
@@ -90,7 +90,7 @@ fr.close()
 
 fr = open(fname, "a")
 
-'''
+
 print('\n\nPlane-wave limit of LE Bessel beam')
 fr.write('\n\nPlane-wave limit of LE Bessel beam')
 opt1 = ' -sym no'

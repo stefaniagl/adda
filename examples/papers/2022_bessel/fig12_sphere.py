@@ -23,7 +23,7 @@ ref_thetaper,ref_iper,ref_thetapar,ref_ipar = bb.extractData('glmt',option)
 
 # data visualisation
 fig = plt.figure(figsize=(9,4),constrained_layout=True)
-fig.set_constrained_layout_pads(wspace=0.1)
+fig.set_constrained_layout_pads(wspace=0.05)
 
 # Parallel scattering intensity (1)
 ax = fig.add_subplot(121)
@@ -41,6 +41,7 @@ bb.plotData(dda_theta,dda_iper,ref_thetaper,ref_iper,2,ax)
 
 # data save
 os.makedirs('saved', exist_ok=True)
+#if needed change .pdf on other types (for example .svg)
 plt.savefig('saved/fig12_sphere.pdf', bbox_inches='tight')
 
 plt.show()
