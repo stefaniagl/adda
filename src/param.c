@@ -118,8 +118,6 @@ bool calc_asym;       // Calculate the asymmetry-parameter
 bool calc_mat_force;  // Calculate the scattering force by matrix-evaluation
 bool store_force;     // Write radiation pressure per dipole to file
 bool store_ampl;      // Write amplitude matrix to file
-bool use_beam_center; // Whether -beam_center argument is used or not
-bool use_beam_subopt; // Whether beam center coordinates are taken from -beam sub-option
 int phi_int_type;     // type of phi integration (each bit determines whether to calculate with different multipliers)
 // used in calculator.c
 bool avg_inc_pol;            // whether to average CC over incident polarization
@@ -378,7 +376,6 @@ void InitBeam(void);
 PARSE_FUNC(alldir_inp);
 PARSE_FUNC(anisotr);
 PARSE_FUNC(asym);
-PARSE_FUNC(beam_center);
 PARSE_FUNC(beam);
 PARSE_FUNC(beam_center);
 PARSE_FUNC(chp_dir);
@@ -458,10 +455,6 @@ static struct opt_struct options[]={
 		"reference frame). '-m' then accepts 6 arguments per each domain. Can not be used with '-pol cldr' and "
 		"'-rect_dip'.",0,NULL},
 	{PAR(asym),"","Calculate the asymmetry vector. Implies '-Csca' and '-vec'",0,NULL},
-	{PAR(beam_center),"<x> <y> <z>","Sets the center of the beam with respect to the initial point in time. "
-				"For plane, Gaussian, and Bessel field it determines the phase in space. "
-				"For a dipole and an electron it determines the position in space.\n"
-		"Default: 0 0 0",3,NULL},
 	{PAR(beam),"<type> [<args>]","Sets the incident beam, either predefined or 'read' from file. All parameters of "
 		"predefined beam types are floats except for <order> or filenames.\n"
 		"Default: plane",UNDEF,beam_opt},
